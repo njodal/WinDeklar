@@ -17,7 +17,7 @@ If you run `python view_example.py` the form is:
 
 ## Form used to tune a PID controller for control a model car
 
-<img width="993" alt="winform_pid" src="https://github.com/njodal/WIndow_form/assets/28706901/13076b88-128c-431a-83cc-cdad12186442">
+<img width="1003" alt="PID tuning" src="https://github.com/njodal/WIndow_form/assets/28706901/c978edfc-808b-47d4-993c-22d00b7fd154">
 
 
 
