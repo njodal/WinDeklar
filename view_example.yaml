@@ -2,22 +2,25 @@ window:
   size: [100, 50, 1000, 500]  # [start_x, start_y, width, height]
   title: Example of a win form
   status_bar: True
+
   menu_bar:
     - item:
         name: File
         title: '&File'
-        type: menu_item
         items:
           - item:
-              title: '&Open File ...'
-              action: open_a_file
+              title: '&Open ...'
+              action: event_open_file            # method to call
           - item:
-              title: 'Second item'
+              title: '&Save'
+              action: event_save_file_as
+          - item:
+              title: 'Save as ...'
+              action: event_save_file_as
           - item:
               is_separator: True
           - item:
               title: 'Item after separator'
-
     - item:
         name: View
         title: '&View'
@@ -32,9 +35,11 @@ window:
     - item:
         icon:    SP_DialogSaveButton
         tooltip: Save
-        title: ' &Save '
+        title:  ' &Save '
+        action: event_save_file
     - item:
-        title: 'Save Map As ...'
+        title: 'Save As ...'
+        action: event_save_file_as
     - item:
         is_separator: True
     - item:
@@ -49,7 +54,7 @@ window:
     - item:
         title: '>|'
         tooltip: Advance to last step
-        action: button_next_last
+        # action: button_next_last
     - item:
         name:    action
         title:   Action

@@ -25,7 +25,7 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
     """
 
     def __init__(self, config_file_name, provider):
-        super(ConfigurableWindow, self).__init__()
+        super(ConfigurableWindow, self).__init__(parent=None)
 
         self.controls = []
         self.provider = provider
@@ -127,7 +127,7 @@ class ParameterAndFigureWindow(QtWidgets.QMainWindow):
     """
 
     def __init__(self, title, size=(300, 300, 1000, 400)):
-        super(ParameterAndFigureWindow, self).__init__()
+        super(ParameterAndFigureWindow, self).__init__(parent=None)
 
         # Define the geometry of the main window
         QTAux.set_window(self, title, size)
@@ -317,7 +317,7 @@ class Dialog(QtWidgets.QDialog):
     Functionality for an Input Panel
     """
     def __init__(self, dialog_name, provider, default_size=(300, 300, 400, 400)):
-        super(Dialog, self).__init__()
+        super(Dialog, self).__init__(parent=None)
 
         self.controls = []
         self.provider = provider
@@ -411,25 +411,31 @@ class HostModel(object):
     def set_main_window(self, main_window):
         self.main_window = main_window
 
-    def refresh_figure(self):
-        if self.main_window is not None:
-            self.main_window.fig_view.draw()
-
     def refresh(self):
-        if self.main_window is not None:
-            self.main_window.refresh()
+        if self.main_window is None:
+            return
+        self.main_window.refresh_controls()
+        self.main_window.refresh()
+
+    def refresh_figure(self):
+        if self.main_window is None:
+            return
+        self.main_window.fig_view.draw()
 
     def refresh_controls(self):
-        if self.main_window is not None:
-            self.main_window.refresh_controls()
+        if self.main_window is None:
+            return
+        self.main_window.refresh_controls()
 
     def refresh_control(self, name):
-        if self.main_window is not None:
-            self.main_window.refresh_control(name)
+        if self.main_window is None:
+            return
+        self.main_window.refresh_control(name)
 
     def set_control_min_max(self, name, min_value, max_value):
-        if self.main_window is not None:
-            self.main_window.set_control_min_max(name, min_value, max_value)
+        if self.main_window is None:
+            return
+        self.main_window.set_control_min_max(name, min_value, max_value)
 
     def set_and_refresh_control(self, control_name, value):
         self.state[control_name] = value
@@ -495,27 +501,37 @@ class HostModel(object):
         # abstract method, use to initialize stuff
         pass
 
-    def open_file(self, open_function, title='Open', done_msg='Done', file_filter='*.*', directory=''):
+    def get_file_name(self, title='Open', file_filter='*.*', directory=''):
+        """
+        Returns a valid file name using the standard dialog
+        :param title:        window title
+        :param file_filter:  show file that comply with this filter only
+        :param directory:    initial directory ('' means current one)
+        :return: a file name (None means no file was chosen)
+        """
         file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self.main_window, title, filter=file_filter,
                                                              directory=directory)
-        if file_name == '':
-            return
-        open_function(file_name, progress_bar=self.get_progress_bar())
-        if done_msg is not None:
-            self.show_status_bar_msg(done_msg)
-            self.refresh()
+        return file_name if file_name != '' else None
 
-    def save_file(self, save_function, title='Save', done_msg='Saved', file_filter='*.*', directory=''):
+    def get_file_name_to_save(self, title='Save', file_filter='*.*', directory=''):
+        """
+        Returns file name to be saved (can be a new one or an existing one
+        :param title:
+        :param file_filter:
+        :param directory:
+        :return:
+        """
         file_name, _ = QtWidgets.QFileDialog.getSaveFileName(self.main_window, title, filter=file_filter,
                                                              directory=directory)
-        if file_name == '':
-            return
-        save_function(file_name, progress_bar=self.get_progress_bar())
-        self.show_status_bar_msg(done_msg)
+        return file_name if file_name != '' else None
 
     def get_progress_bar(self):
+        """
+        Returns a progress bar to be displayed in the status bar
+        :return:
+        """
         # if main_windows is not set yet just return an empty one in order not to crash,
-        # is it not a problem because main_window will be set later
+        # this it not a problem because main_window will be set later
         return self.main_window.progress_bar if self.main_window is not None else GeneralProgressBar()
 
     def title(self):
@@ -836,7 +852,7 @@ def set_figure_layout(father_layout, layout_config, window, key_axes='axes_limit
 def create_menu_bar(config, main_window, provider, key='menu_bar'):
     if key not in config:
         return None
-    menu_bar = QtWidgets.QMenuBar()
+    menu_bar = QtWidgets.QMenuBar(parent=main_window)
     menu_bar_config = config[key]
     for main_item1 in menu_bar_config:
         main_item = main_item1['item']
@@ -904,24 +920,34 @@ def create_status_bar(win_config, main_window, status_key='status_bar'):
 class GeneralProgressBar:
     """
     Handle a ProgressBar to be used inside any widget, main use is to put it in a StatusBar
-    Note: if widget is None all methods must work anyway, in order to all calling usage don't need to check if
+    Note: if widget is None all methods must work anyway, in order to free all calling usage to check whether
           ProgressBar is present or not
     """
 
     def __init__(self, widget=None, stretch=0, visible=False):
+        """
+        init
+        :param widget:  widget where the progress bar will show. due to some initialization timing sometime widget can be None
+        :param stretch: amount of extra space to be used inside widget. 0 means original size, usually 1 is enough to
+                        guarantee it will occupy the full widget
+        :param visible:
+        """
         self.parent = widget
-        if self.parent is not None:
-            self.progress_bar = QtWidgets.QProgressBar()
-            self.parent.addWidget(self.progress_bar, stretch=stretch)
-            self.progress_bar.setVisible(visible)
+        if self.parent is None:
+            return
+        self.progress_bar = QtWidgets.QProgressBar(parent=self.parent)
+        self.parent.addWidget(self.progress_bar, stretch=stretch)
+        self.progress_bar.setVisible(visible)
 
     def get_maximum(self):
-        if self.parent is not None:
-            return self.progress_bar.maximum()
+        if self.parent is None:
+            return
+        return self.progress_bar.maximum()
 
     def get_value(self):
-        if self.parent is not None:
-            return self.progress_bar.value()
+        if self.parent is None:
+            return
+        return self.progress_bar.value()
 
     def reset(self, text=None):
         if self.parent is None:
@@ -938,12 +964,14 @@ class GeneralProgressBar:
         self.progress_bar.setVisible(True)
 
     def set_value(self, value):
-        if self.parent is not None:
-            self.progress_bar.setValue(value)
+        if self.parent is None:
+            return
+        self.progress_bar.setValue(value)
 
     def add_increment(self, increment):
-        if self.parent is not None:
-            self.progress_bar.setValue(self.progress_bar.value()+increment)
+        if self.parent is None:
+            return
+        self.progress_bar.setValue(self.progress_bar.value()+increment)
 
 
 # Controls definition

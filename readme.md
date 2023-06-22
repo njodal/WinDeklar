@@ -1,5 +1,5 @@
 # Description
-A simple, declarative oriented framework to create Window Forms in Python.
+A simple, declarative oriented framework to create WinForms in Python.
 
 While it can be used for all kinds of forms, it was created with the purpose of being applied in Robotics, where the need to visualize complex algorithms and, above all, observe the effect of parameter changes is very common.
 

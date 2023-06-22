@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/window_form.iml" filepath="$PROJECT_DIR$/.idea/window_form.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../WinDeklar/.idea/WinDeklar.iml" filepath="$PROJECT_DIR$/../WinDeklar/.idea/WinDeklar.iml" />
     </modules>
   </component>
 </project>
