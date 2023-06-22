@@ -44,6 +44,9 @@ class PointsBox:
         ax.set_ylim([min1, max1])
 
     def set_bounds(self, ax, inc=1.0):
+        if self.is_empty:
+            # defensive programming
+            return
         ax.set_xbound(lower=add_inc(self.min_x, inc, -1), upper=add_inc(self.max_x, inc, 1))
         ax.set_ybound(lower=add_inc(self.min_y, inc, -1), upper=add_inc(self.max_y, inc, 1))
 

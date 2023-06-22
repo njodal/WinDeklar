@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 
 import sys
-import math
-import random
 import time
-import matplotlib.lines as mlines
 
 import QTAux
 import WindowForm as WinForm
-import points_box as pb
+import graph_aux as ga
 import record as rc
 import yaml_functions
 
@@ -49,8 +46,8 @@ class ExampleHost(WinForm.HostModel):
         """
         points = self.get_graph_points()
         show_axis = [True, True] if self.state.get(self.axis_key, True) else [False, False]
-        graph_points(ax, points, x_visible=show_axis[0], y_visible=show_axis[1],
-                     line_width=self.state.get(self.width_key, 1.0))
+        ga.graph_points(ax, points, x_visible=show_axis[0], y_visible=show_axis[1],
+                        line_width=self.state.get(self.width_key, 1.0))
 
     def redraw(self):
         """
@@ -130,16 +127,11 @@ class ExampleHost(WinForm.HostModel):
         Returns the points (x,y) to be graphed depending on the graph type and number of points
         :return:
         """
-        graph_type = self.state.get(self.type_key, 'None')
+        function_name    = self.state.get(self.type_key, 'None')
         number_of_points = int(self.state.get(self.points_key, 10))
-        if graph_type == 'Random':
-            points = random_function(0, number_of_points)
-        elif graph_type == 'Sine':
-            points = any_function(0, number_of_points, math.sin, inc=math.radians(10))
-        elif graph_type == 'Cosine':
-            points = any_function(0, number_of_points, math.cos, inc=math.radians(10))
-        else:
-            self.show_status_bar_msg('%s not implemented' % graph_type)
+        points, msg      = ga.graph_points_for_many_functions(function_name, number_of_points)
+        if points is None:
+            self.show_status_bar_msg('%s not implemented' % function_name)
             points = []
         return points
 
@@ -151,42 +143,9 @@ def progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2):
         time.sleep(sleep_time)
 
 
-def graph_points(ax, points, inc=1.1, scale_type='scaled', x_visible=True, y_visible=True, line_width=1.0):
-    point_box = pb.PointsBox()
-    point_box.add_points(points)  # to calc bounds
-    ax.axis(scale_type)
-    ax.get_xaxis().set_visible(x_visible)
-    ax.get_yaxis().set_visible(y_visible)
-    number_of_points = len(points)
-    if number_of_points == 0:
-        pass
-    else:
-        first_point = points[0]
-        for i in range(1, number_of_points):
-            [x2, y2] = points[i]
-            line     = mlines.Line2D([first_point[0], x2], [first_point[1], y2], linewidth=line_width)
-            ax.add_line(line)
-            first_point = [x2, y2]
-    point_box.set_bounds(ax, inc)
-
-
-def random_function(from_x, to_x, min_y=0, max_y=10):
-    return [[x, random.randint(min_y, max_y)] for x in range(from_x, to_x)]
-
-
-def any_function(from_x, to_x, function, inc=math.radians(5)):
-    points = []
-    x      = 0.0
-    for i in range(from_x, to_x):
-        points.append([x, function(x)])
-        x += inc
-    return points
-
-
 if __name__ == '__main__':
     app = QTAux.def_app()
-    win_config_name = 'view_example.yaml'
-
-    provider = ExampleHost()
-    myGUI = WinForm.ConfigurableWindow(win_config_name, provider)
+    win_config_name = 'view_example.yaml'  # window definition
+    provider        = ExampleHost()        # class to handle events
+    myGUI           = WinForm.ConfigurableWindow(win_config_name, provider)
     sys.exit(app.exec_())

@@ -19,12 +19,14 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
     Notes:
         - a config_file_name is a yaml that has the definition (see view_map.yaml)
         - a typical windows has some controls in the left and a Figure in the right (like an ego view or a map)
-    parameters:
-       config_file_name - see above
-       provider - an object derived from HostModel
     """
 
     def __init__(self, config_file_name, provider):
+        """
+        Init
+        :param config_file_name: name of the file containing the window definition
+        :param provider: handles all the form logic, usually a subclass of HostModel
+        """
         super(ConfigurableWindow, self).__init__(parent=None)
 
         self.controls = []
@@ -119,73 +121,6 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
             print('No status bar defined')
             return
         self.statusbar.showMessage(msg)
-
-
-class ParameterAndFigureWindow(QtWidgets.QMainWindow):
-    """
-    Window to show parameters on the left and data that change at real time on the right
-    """
-
-    def __init__(self, title, size=(300, 300, 1000, 400)):
-        super(ParameterAndFigureWindow, self).__init__(parent=None)
-
-        # Define the geometry of the main window
-        QTAux.set_window(self, title, size)
-
-        # Create FRAME_A
-        self.FRAME_A = QtWidgets.QFrame(self)
-        self.FRAME_A.setStyleSheet("QWidget { background-color: %s }" % QtGui.QColor(210, 210, 235, 255).name())
-        self.LAYOUT_A = QtWidgets.QGridLayout()
-        self.FRAME_A.setLayout(self.LAYOUT_A)
-        self.setCentralWidget(self.FRAME_A)
-
-        self.LAYOUT_LEFT = QtWidgets.QVBoxLayout()
-        self.LAYOUT_A.addLayout(self.LAYOUT_LEFT, 0, 0)
-
-
-class ControlAndFigureWindow(ParameterAndFigureWindow):
-    """
-    Handle a Window with many controls at right and a figure at left
-     a 'provider' object must implement (usually of type HostModel):
-        .controls_def  - returns the controls definitions
-        .get_control_value
-        .set_control_value
-        .title         - returns window title
-        .update_view   - called every time a control change
-        .onclick       - to handle mouse click over the figure
-        .on_mouse_move - to handle mouse movement over the figure
-    """
-
-    def __init__(self, provider, size=(800, 500, 800, 500), view_size=(2, 2)):
-        self.controls = []   # do not remove
-        self.provider = provider
-        super(ControlAndFigureWindow, self).__init__(self.provider.title(), size)
-
-        self.fig_view = FigureView(self, size=view_size, axes_limits=self.provider.axes_limits())
-        self.LAYOUT_A.addWidget(self.fig_view, *(0, 1))
-
-        self.define_controls()
-        self.fig_view.update_figure()
-        self.show()
-
-    def define_controls(self):
-        self.controls = def_controls(self.provider.controls_def(), self.fig_view, self.LAYOUT_LEFT)
-
-    def refresh_other_widgets(self, control_name):
-        # if a widget that affect the value of others changed, it is needed to refresh all others'
-        #    ex: in view_color, the encoding combo changes the values of low and high sliders
-        changed = self.get_control_by_name(control_name)
-        if changed is not None and changed.refresh_others:
-            # print('refresh others')
-            for control in self.controls:
-                if control != changed:
-                    control.refresh()
-
-    def get_control_by_name(self, control_name):
-        for control in self.controls:
-            if control.name == control_name:
-                return control
-        return None
 
 
 class FigureView(FigureCanvas):
