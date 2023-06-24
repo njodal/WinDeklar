@@ -86,6 +86,11 @@ class ExampleHost(WinForm.HostModel):
         value = '%s %s' % (self.action_name, self.last_action_number)
         self.set_and_refresh_control(self.action_key, value)
 
+    def on_mouse_move(self, event, ax):
+        if event.xdata is None or event.ydata is None:
+            return
+        self.show_status_bar_msg('x:%.2f y:%.2f' % (event.xdata, event.ydata))
+
     # particular code
     def open_yaml_file(self, file_name, progress_bar):
         """
