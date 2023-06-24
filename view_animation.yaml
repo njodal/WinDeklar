@@ -1,0 +1,116 @@
+window:
+  size: [100, 50, 1000, 500]  # [start_x, start_y, width, height]
+  title: Example of a win form
+  status_bar: True
+
+  menu_bar:
+    - item:
+        name: File
+        title: '&File'
+        items:
+          - item:
+              title: '&Open ...'
+              action: event_open_file            # method to call
+          - item:
+              title: '&Save'
+              action: event_save_file_as
+          - item:
+              title: 'Save as ...'
+              action: event_save_file_as
+          - item:
+              is_separator: True
+          - item:
+              title: 'Item after separator'
+    - item:
+        name: View
+        title: '&View'
+        type: menu_item
+        items:
+          - item:
+              title: 'Item1'
+          - item:
+              title: 'Item2'
+
+  toolbar:
+    - item:
+        icon:    SP_DialogSaveButton
+        tooltip: Save
+        title:  ' &Save '
+        action: event_save_file
+    - item:
+        title: 'Save As ...'
+        action: event_save_file_as
+    - item:
+        is_separator: True
+    - item:
+        title: '>'
+        tooltip: Advance one step
+    - item:
+        title: '>>'
+        tooltip: Advance fast
+    - item:
+        title: '>>>'
+        tooltip: Advance faster
+    - item:
+        title: '>|'
+        tooltip: Advance to last step
+        # action: button_next_last
+    - item:
+        name:    action
+        title:   Action
+        type:    Action
+        action:  change_action
+        tooltip: Click to change it
+
+  layout:
+    - item:
+        name:    main
+        type:    grid
+        subtype: vertical
+        layout:
+          - item:
+              name:    controls_and_figure
+              type:    grid
+              subtype: horizontal
+              layout:
+                - item:
+                    name:    controls
+                    type:    grid
+                    subtype: vertical
+                    desc:    panel is composed of two sides, the one at the left has controls, at the right a Figure to show a grapth
+                    controls:
+                      - control:
+                          name:    graph_type
+                          title:   Graph Type
+                          type:    Combo
+                          values:  [Sine, Cosine, Random, Other]
+                          value:   Random
+                      - control:
+                          name:    show_axis     # internal name (used in programs), if changed need to change program also
+                          title:   Show Axis     # external name, can be changed without problem
+                          type:    Check         # type of control: Check, Slider, Button, Combo
+                          value:   True          # initial value
+                      - control:
+                          name:    points
+                          title:   Number of points
+                          type:    Slider
+                          parms:   [2, 100, 1]      # [min_value, max_value, scale]
+                          value:   20
+                      - control:
+                          name:    line_width
+                          title:   Line Width
+                          type:    EditNumberSpin
+                          parms:   {step: 1.0}
+                          value:   1.0
+                      - control:
+                          name:    redraw
+                          title:   Draw again
+                          type:    Button
+                          action:  redraw   # method to call
+
+                - item:
+                    name:    graph
+                    type:    figure
+                    subtype: real_time_graph
+                    view_size: [10, 10]
+

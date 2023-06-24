@@ -1,3 +1,4 @@
+import numpy as np
 import random
 import math
 import matplotlib.lines as mlines
@@ -39,6 +40,9 @@ def graph_points(ax, points, inc=1.1, scale_type='scaled', x_visible=True, y_vis
 
 
 def random_function(from_x, to_x, min_y=0, max_y=10):
+    # x = np.linspace(from_x, to_x)
+    # y = np.random.randint(min_y, max_y, len(x))
+    # return x, y
     return [[x, random.randint(min_y, max_y)] for x in range(from_x, to_x)]
 
 
