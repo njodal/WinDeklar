@@ -2,8 +2,7 @@
 
 import sys
 import time
-import matplotlib.pyplot as plt
-from matplotlib import animation
+import numpy as np
 
 import QTAux
 import WindowForm as WinForm
@@ -28,6 +27,7 @@ class ExampleHost(WinForm.HostModel):
         self.width_key  = 'line_width'
 
         # animation attributes
+        self.animation = None
         self.fig = None
         self.gcf = None
         self.patches = []
@@ -43,6 +43,20 @@ class ExampleHost(WinForm.HostModel):
 
         initial_values = {}
         super(ExampleHost, self).__init__(initial_values=initial_values)
+
+    def initialize(self):
+        # self.main_window.fig_view.clear()
+        # data_provider  = an.RealTimeFunctionDataProvider(min_y=-1.2, max_y=1.2, function=np.sin)
+        # self.animation = an.RealTimeGraph(self.main_window.fig_view.figure, data_provider)
+        pass
+
+    def get_data_provider(self):
+        bounds        = [-1, 50]
+        data_provider = [an.RealTimeFunctionDataProvider(min_y=-1.1, max_y=1.1, function=np.sin)]
+        return bounds, data_provider
+
+    def axes_limits(self):
+        return 0, 100, -1, 1
 
     def update_view(self, ax):
         """
@@ -163,7 +177,4 @@ if __name__ == '__main__':
     win_config_name = 'view_animation.yaml'  # window definition
     provider        = ExampleHost()        # class to handle events
     myGUI           = WinForm.ConfigurableWindow(win_config_name, provider)
-    figure          = provider.main_window.fig_view.figure
-    animation = an.Animation(provider, figure, (-10, 100, -20, 100), (0, 0), interval=1000)
-
-    # sys.exit(app.exec_())
+    sys.exit(app.exec_())

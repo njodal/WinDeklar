@@ -90,7 +90,7 @@ class RealTimeFunctionDataProvider(RealTimeDataProvider):
 
 class MainWindow(QMainWindow):
     def __init__(self):
-        super().__init__()
+        super().__init__(None)
         self.setWindowTitle("Animated Graph")
 
         # Create a Matplotlib figure
@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(canvas)
 
         # Create a widget to hold the layout
-        widget = QWidget()
+        widget = QWidget(None)
         widget.setLayout(layout)
 
         # Set the widget as the central content of the main window

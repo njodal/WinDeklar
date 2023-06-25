@@ -111,6 +111,6 @@ window:
                 - item:
                     name:    graph
                     type:    figure
-                    subtype: real_time_graph
+                    subtype: animation
                     view_size: [10, 10]
 

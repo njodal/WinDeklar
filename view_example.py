@@ -12,7 +12,11 @@ import yaml_functions
 
 class ExampleHost(WinForm.HostModel):
     """
-    Shows tentacles
+    Example of a Form with many features:
+        * Open and Save files
+        * Toolbar
+        * Many kinds of controls (Slider, Combo, Check, Button, etc.)
+        * Mouse move
     """
 
     def __init__(self, default_directory='/tmp', file_extension='yaml'):
@@ -32,7 +36,7 @@ class ExampleHost(WinForm.HostModel):
         self.file_filter        = '*.%s' % self.file_extension
         self.file_name          = None
 
-        initial_values = {}
+        initial_values = {}  # used in case some control have a initial value programmatically
         super(ExampleHost, self).__init__(initial_values=initial_values)
 
     def update_view(self, ax):

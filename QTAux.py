@@ -20,7 +20,7 @@ class Communicate(QtCore.QObject):
 
 
 def set_button(name, width, height, layout, action):
-    button = QtWidgets.QPushButton(text=name)
+    button = QtWidgets.QPushButton(name)
     set_custom_size(button, width, height)
     button.clicked.connect(action)
     layout.addWidget(button)
@@ -109,7 +109,7 @@ class ScreenControl(object):
 
     def get_widget(self):
         # abstract method
-        return False, 0
+        return False, None
 
     def value(self):
         # abstract method
@@ -124,7 +124,7 @@ class EnumCombo(ScreenControl):
     def __init__(self, name, title, bound, enum, action, layout, tooltip=None):
     
         self.enum  = enum
-        self.combo = QtWidgets.QComboBox()
+        self.combo = QtWidgets.QComboBox(None)
         for member in self.enum:
             self.combo.addItem(member.name)
 
@@ -153,7 +153,7 @@ class EnumCombo(ScreenControl):
 
 class Combo(ScreenControl):
     def __init__(self, name, title, bound, action, layout, control_def, tooltip=None, values_key='values'):
-        self.combo = QtWidgets.QComboBox()
+        self.combo = QtWidgets.QComboBox(None)
 
         self.combo.currentTextChanged.connect(self.changed)
         super(Combo, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
@@ -311,7 +311,7 @@ class EditNumberSpin(ScreenControl):
         # Widget must be created before calling super
         parms = control_def.get(parms_def, {})
         is_integer = parms.get(type_def, 'float') == 'integer'
-        self.edit_spin = QtWidgets.QSpinBox() if is_integer else QtWidgets.QDoubleSpinBox()
+        self.edit_spin = QtWidgets.QSpinBox(None) if is_integer else QtWidgets.QDoubleSpinBox(None)
         if step_def in parms:
             self.edit_spin.setSingleStep(parms[step_def])
         if min_def in parms:
@@ -403,7 +403,7 @@ class ProgressBar(ScreenControl):
     def __init__(self, name, bound, action, layout, tooltip=None):
 
         # Widget must be created before calling super
-        self.progress_bar = QtWidgets.QProgressBar()
+        self.progress_bar = QtWidgets.QProgressBar(None)
         super(ProgressBar, self).__init__(name, '', bound, action, layout, tooltip=tooltip)
 
     def get_widget(self):

@@ -3,7 +3,9 @@ import functools
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib import animation
 
+import signal as sg
 import points_box
 import yaml_functions as yaml
 import record as rc
@@ -128,13 +130,15 @@ class FigureView(FigureCanvas):
     Display a drawing that responds to a change in control values
     """
 
-    def __init__(self, parent, size=(1, 1), axes_limits=None, scaled=True, x_visible=True, y_visible=True):
+    def __init__(self, parent, size=(1, 1), axes_limits=None, subtype=None, scaled=True, x_visible=True,
+                 y_visible=True, animation_key='animation'):
 
-        self.parent     = parent
-        self.size_dim   = size
-        (width, height) = self.size_dim
-        self.figure     = Figure(figsize=None)  # not necessary to set figsize
-        self.axes       = self.figure.add_subplot(111)
+        self.parent   = parent
+        self.size_dim = size
+        self.subtype  = subtype
+        width, height = self.size_dim
+        self.figure   = Figure(figsize=None)  # not necessary to set figsize
+        self.axes     = self.figure.add_subplot(111)
 
         if axes_limits is None:
             self.x_lower, self.x_upper = [-width, width]
@@ -143,7 +147,7 @@ class FigureView(FigureCanvas):
             [self.x_lower, self.x_upper, self.y_lower, self.y_upper] = axes_limits
 
         self.x_visible, self.y_visible = [x_visible, y_visible]
-        self.scaled = scaled
+        self.scaled = False if self.subtype == animation_key else scaled
 
         self.set_axis()
 
@@ -160,6 +164,18 @@ class FigureView(FigureCanvas):
         dec         = 0.95
         self.text_x = - width * dec
         self.text_y = height  * dec
+
+        # animation logic
+        self.graph_lines   = None  # to signal graph are not initialized yet
+        self.data_provider = None
+        self.graph_bounds  = None
+        self.repeat_length = 0
+        if self.subtype == animation_key:
+            self.graph_bounds, self.data_provider = self.parent.provider.get_data_provider()
+            if self.data_provider is None:
+                raise Exception(
+                    'Figure is defined as "animation" but not data provider is given, implement get_data_provider() in provider ')
+            self.anim = animation.FuncAnimation(self.figure, self.update_frame, frames=None, interval=100, blit=False)
 
     def clear(self):
         self.axes.clear()
@@ -219,6 +235,43 @@ class FigureView(FigureCanvas):
         self.parent.provider.set_control_value(name, value)
         self.parent.refresh_other_widgets(name)
         self.update_figure()
+
+    def update_frame(self, frame_number):
+        # first time do initializations
+        if self.graph_lines is None:
+            self.initialize_graph_lines(self.graph_bounds, self.data_provider)
+
+        # update graphs
+        for [line, dp, xs, ys] in self.graph_lines:
+            x, y = dp.get_next_values(frame_number)
+            # print(' frame:%s x:%s y:%s' % (frame, x, y))
+            xs.append(x)
+            ys.append(y)
+
+            x_max = xs.max()
+            if x_max > self.repeat_length:
+                self.axes.set_xlim(x_max - self.repeat_length, x_max)
+            line.set_data(xs.values, ys.values)
+
+    def initialize_graph_lines(self, bounds, data_provider):
+        min_x, max_x       = bounds
+        self.repeat_length = max_x - min_x
+        self.graph_lines = []
+        for dp in data_provider:
+            line, = self.axes.plot([], [], color=dp.color)
+            self.graph_lines.append([line, dp, sg.SignalHistory(self.repeat_length),
+                                     sg.SignalHistory(self.repeat_length)])
+        # Set the axis limits
+        self.axes.set_xlim(min_x, self.repeat_length)
+        min_y = None
+        max_y = None
+        for dp in self.data_provider:
+            min_y1, max_y1 = dp.get_bounds()
+            if min_y is None or min_y1 < min_y:
+                min_y = min_y1
+            if max_y is None or max_y1 > max_y:
+                max_y = max_y1
+        self.axes.set_ylim(min_y, max_y)
 
 
 class SimpleFigure:
@@ -598,6 +651,14 @@ class HostModel(object):
         # abstract method
         return {}
 
+    # animation methods
+    def get_data_provider(self):
+        """
+        Abstract method
+        :return: x axis bounds (ex: [-1, 100]), subclass of RealTimeDataProvider (can be None)
+        """
+        return None, None
+
 
 class PropertiesHost(HostModel):
     """
@@ -776,10 +837,11 @@ def set_sub_layout(father_layout, layout_config, controls, window, row_col=None)
     return layout, fig_view
 
 
-def set_figure_layout(father_layout, layout_config, window, key_axes='axes_limits'):
+def set_figure_layout(father_layout, layout_config, window, key_axes='axes_limits', subtype_key='subtype'):
     axes_limits = layout_config.get(key_axes, None)
+    subtype     = layout_config.get(subtype_key, None)
     size        = window.provider.view_size() if window.provider is not None else (1, 0)
-    fig_view    = FigureView(window, size=size, axes_limits=axes_limits)
+    fig_view    = FigureView(window, size=size, axes_limits=axes_limits, subtype=subtype)
     father_layout.addWidget(fig_view)
     return fig_view
 
