@@ -41,7 +41,7 @@ class RealTimeRandomDataProvider(RealTimeDataProvider):
 
 
 class RealTimeFunctionDataProvider(RealTimeDataProvider):
-    def __init__(self, dt=0.1, min_y=-1.2, max_y=1.2,function=np.sin, inc=np.radians(10), color='Red'):
+    def __init__(self, dt=0.1, min_y=-1.2, max_y=1.2, function=np.sin, inc=np.radians(10), color='Red'):
         self.function = function
         self.inc      = inc
         self.last_r   = 0.0
@@ -69,7 +69,8 @@ def graph_points_for_many_functions(function_name, number_of_points):
     return points, msg
 
 
-def graph_points(ax, points, inc=1.1, scale_type='scaled', x_visible=True, y_visible=True, line_width=1.0, color='Blue'):
+def graph_points(ax, points, inc=1.1, scale_type='scaled', x_visible=True, y_visible=True, line_width=1.0,
+                 color='Blue'):
     point_box = pb.PointsBox()
     point_box.add_points(points)  # to calc bounds
     ax.axis(scale_type)
@@ -102,5 +103,3 @@ def get_function_xy_values(function, from_x, to_x, inc=math.radians(5)):
         points.append([x, function(x)])
         x += inc
     return points
-
-

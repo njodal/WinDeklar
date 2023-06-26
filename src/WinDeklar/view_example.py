@@ -3,9 +3,9 @@
 import sys
 import time
 
-import QTAux
 import WindowForm as WinForm
 import graph_aux as ga
+import QTAux
 import record as rc
 import yaml_functions
 
@@ -36,7 +36,7 @@ class ExampleHost(WinForm.HostModel):
         self.file_filter        = '*.%s' % self.file_extension
         self.file_name          = None
 
-        initial_values = {}  # used in case some control have a initial value programmatically
+        initial_values = {}  # used in case some control have an initial value programmatically
         super(ExampleHost, self).__init__(initial_values=initial_values)
 
     def update_view(self, ax):
@@ -71,10 +71,11 @@ class ExampleHost(WinForm.HostModel):
             return
         self.file_name = file_name
         # particular code to open the file
-        self.open_yaml_file(self.file_name,progress_bar=self.get_progress_bar())
+        self.open_yaml_file(self.file_name, progress_bar=self.get_progress_bar())
 
     def event_save_file_as(self):
-        file_name = self.get_file_name_to_save(title='Save File', file_filter=self.file_filter, directory=self.directory)
+        file_name = self.get_file_name_to_save(title='Save File', file_filter=self.file_filter,
+                                               directory=self.directory)
         if file_name is None:
             return
         self.save_file(file_name, progress_bar=self.get_progress_bar())

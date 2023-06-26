@@ -1,5 +1,6 @@
 from collections import deque
 
+
 class SignalHistory(object):
     """
     Store the last N values of a Signal

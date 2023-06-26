@@ -4,15 +4,14 @@ import sys
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib import animation
-
-import signal as sg
-import points_box
-import yaml_functions as yaml
-import record as rc
-
 from PyQt5 import QtGui, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+import points_box
 import QTAux
+import record as rc
+import signal_aux as sg
+import yaml_functions as yaml
 
 
 class ConfigurableWindow(QtWidgets.QMainWindow):
@@ -183,7 +182,8 @@ class FigureView(FigureCanvas):
                 self.parent.provider.get_data_provider()
             if self.data_provider is None:
                 raise Exception(
-                    'Figure is defined as "animation" but not data provider is given, implement get_data_provider() in provider ')
+                    'Figure is defined as "animation" but not data provider is given, implement get_data_provider() '
+                    'in provider ')
             self.anim = animation.FuncAnimation(self.figure, self.update_frame, frames=None, interval=interval,
                                                 blit=False)
 
@@ -266,13 +266,22 @@ class FigureView(FigureCanvas):
             line.set_data(xs.values, ys.values)
 
     def initialize_graph_lines(self, bounds, data_provider):
-        min_x, max_x     = bounds
+        """
+        Initialize each of the graph lines
+        :param bounds:
+        :param data_provider:
+        :return:
+        """
+        # Create a line for each data provider
         self.graph_lines = []
         for dp in data_provider:
             line, = self.axes.plot([], [], color=dp.color)
-            self.graph_lines.append([line, dp, sg.SignalHistory(self.points_in_graph),
-                                     sg.SignalHistory(self.points_in_graph)])
+            xs = sg.SignalHistory(self.points_in_graph)
+            ys = sg.SignalHistory(self.points_in_graph)
+            self.graph_lines.append([line, dp, xs, ys])
+
         # Set the axis limits
+        min_x, max_x     = bounds
         self.axes.set_xlim(min_x, max_x)
         min_y = None
         max_y = None
@@ -285,12 +294,17 @@ class FigureView(FigureCanvas):
         self.axes.set_ylim(min_y, max_y)
 
     def stop_animation(self):
+        if self.anim is None:
+            return
         self.anim.event_source.stop()
         self.anim_is_running = False
 
     def start_animation(self):
+        if self.anim is None:
+            return
         self.anim.event_source.start()
         self.anim_is_running = True
+
 
 class SimpleFigure:
     """
@@ -698,6 +712,7 @@ class HostModel(object):
     def start_animation(self):
         self.main_window.fig_view.start_animation()
 
+
 class PropertiesHost(HostModel):
     """
     HostModel specialized for editing a set of properties (defined as a dict)
@@ -962,7 +977,8 @@ class GeneralProgressBar:
     def __init__(self, widget=None, stretch=0, visible=False):
         """
         init
-        :param widget:  widget where the progress bar will show. due to some initialization timing sometime widget can be None
+        :param widget:  widget where the progress bar will show. due to some initialization timing sometime widget can
+                        be None
         :param stretch: amount of extra space to be used inside widget. 0 means original size, usually 1 is enough to
                         guarantee it will occupy the full widget
         :param visible:

@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 
-import signal as sg
+import signal_aux as sg
 
 
 class RealTimeGraph:
