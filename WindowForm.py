@@ -85,8 +85,15 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
 
     def set_control_min_max(self, control_name, min_value, max_value):
         control = self.get_control_by_name(control_name)
-        if control is not None:
-            control.set_min_max(min_value, max_value)
+        if control is None:
+            return
+        control.set_min_max(min_value, max_value)
+
+    def set_control_title(self, control_name, new_title):
+        control = self.get_control_by_name(control_name)
+        if control is None:
+            return
+        control.set_ename(new_title)
 
     def refresh(self):
         if self.fig_view:
@@ -169,13 +176,16 @@ class FigureView(FigureCanvas):
         self.graph_lines   = None  # to signal graph are not initialized yet
         self.data_provider = None
         self.graph_bounds  = None
-        self.repeat_length = 0
+        self.points_in_graph = 0
+        self.anim_is_running = False
         if self.subtype == animation_key:
-            self.graph_bounds, self.data_provider = self.parent.provider.get_data_provider()
+            interval, self.points_in_graph, self.graph_bounds, self.data_provider = \
+                self.parent.provider.get_data_provider()
             if self.data_provider is None:
                 raise Exception(
                     'Figure is defined as "animation" but not data provider is given, implement get_data_provider() in provider ')
-            self.anim = animation.FuncAnimation(self.figure, self.update_frame, frames=None, interval=100, blit=False)
+            self.anim = animation.FuncAnimation(self.figure, self.update_frame, frames=None, interval=interval,
+                                                blit=False)
 
     def clear(self):
         self.axes.clear()
@@ -236,11 +246,13 @@ class FigureView(FigureCanvas):
         self.parent.refresh_other_widgets(name)
         self.update_figure()
 
+    # animation methods
     def update_frame(self, frame_number):
         # first time do initializations
         if self.graph_lines is None:
             self.initialize_graph_lines(self.graph_bounds, self.data_provider)
 
+        self.anim_is_running = True
         # update graphs
         for [line, dp, xs, ys] in self.graph_lines:
             x, y = dp.get_next_values(frame_number)
@@ -249,20 +261,19 @@ class FigureView(FigureCanvas):
             ys.append(y)
 
             x_max = xs.max()
-            if x_max > self.repeat_length:
-                self.axes.set_xlim(x_max - self.repeat_length, x_max)
+            if x_max > self.graph_bounds[1]:
+                self.axes.set_xlim(x_max - self.graph_bounds[1], x_max)
             line.set_data(xs.values, ys.values)
 
     def initialize_graph_lines(self, bounds, data_provider):
-        min_x, max_x       = bounds
-        self.repeat_length = max_x - min_x
+        min_x, max_x     = bounds
         self.graph_lines = []
         for dp in data_provider:
             line, = self.axes.plot([], [], color=dp.color)
-            self.graph_lines.append([line, dp, sg.SignalHistory(self.repeat_length),
-                                     sg.SignalHistory(self.repeat_length)])
+            self.graph_lines.append([line, dp, sg.SignalHistory(self.points_in_graph),
+                                     sg.SignalHistory(self.points_in_graph)])
         # Set the axis limits
-        self.axes.set_xlim(min_x, self.repeat_length)
+        self.axes.set_xlim(min_x, max_x)
         min_y = None
         max_y = None
         for dp in self.data_provider:
@@ -273,6 +284,13 @@ class FigureView(FigureCanvas):
                 max_y = max_y1
         self.axes.set_ylim(min_y, max_y)
 
+    def stop_animation(self):
+        self.anim.event_source.stop()
+        self.anim_is_running = False
+
+    def start_animation(self):
+        self.anim.event_source.start()
+        self.anim_is_running = True
 
 class SimpleFigure:
     """
@@ -424,6 +442,11 @@ class HostModel(object):
         if self.main_window is None:
             return
         self.main_window.set_control_min_max(name, min_value, max_value)
+
+    def set_control_title(self, name, new_title):
+        if self.main_window is None:
+            return
+        self.main_window.set_control_title(name, new_title)
 
     def set_and_refresh_control(self, control_name, value):
         self.state[control_name] = value
@@ -652,13 +675,28 @@ class HostModel(object):
         return {}
 
     # animation methods
-    def get_data_provider(self):
+    def get_data_provider(self, interval=100, min_x=0.0, max_x=10.0, data_provider=None):
         """
         Abstract method
-        :return: x axis bounds (ex: [-1, 100]), subclass of RealTimeDataProvider (can be None)
+        :param interval: time at which show new data (in milliseconds)
+        :param max_x:    max value in the x-axis, values greater than this will cause the graph to scroll left
+        :param min_x:    start value for the x-axis
+        :param data_provider:  subclass of RealTimeDataProvider (can be None)
+        :return: interval (milliseconds), number of points to show, x axis bounds (ex: [-1, 100]), subclass of
+                 RealTimeDataProvider (can be None)
         """
-        return None, None
+        dt            = interval/1000  # seconds
+        max_points    = int(max_x/dt) + 1
+        return interval, max_points, (min_x, max_x), data_provider
 
+    def anim_is_running(self):
+        return self.main_window.fig_view.anim_is_running
+
+    def stop_animation(self):
+        self.main_window.fig_view.stop_animation()
+
+    def start_animation(self):
+        self.main_window.fig_view.start_animation()
 
 class PropertiesHost(HostModel):
     """

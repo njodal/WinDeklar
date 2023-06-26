@@ -119,6 +119,9 @@ class ScreenControl(object):
         # abstract method
         pass
 
+    def set_ename(self, new_ename):
+        self.ename = new_ename
+
 
 class EnumCombo(ScreenControl):
     def __init__(self, name, title, bound, enum, action, layout, tooltip=None):
@@ -244,6 +247,10 @@ class Button(ScreenControl):
 
     def get_widget(self):
         return True, self.button
+
+    def set_ename(self, new_ename):
+        self.ename = new_ename
+        self.button.setText(self.ename)
 
 
 class CheckButton(ScreenControl):
@@ -372,6 +379,10 @@ class Action(ScreenControl):
     def refresh(self):
         # print('refresh title:%s' % self.current_value())
         self.qt_action.setText(self.current_value())
+
+    def set_ename(self, new_ename):
+        self.ename = new_ename
+        self.qt_action.setText(self.ename)
 
 
 class Label(ScreenControl):

@@ -6,6 +6,55 @@ import matplotlib.lines as mlines
 import points_box as pb
 
 
+class RealTimeDataProvider(object):
+    def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Red'):
+        self.min_y = min_y
+        self.max_y = max_y
+        self.color = color
+        self.dt    = dt
+        self.t     = 0.0
+
+    def get_bounds(self):
+        return self.min_y, self.max_y
+
+    def get_min_y(self):
+        return self.min_y
+
+    def get_max_y(self):
+        return self.max_y
+
+    def get_next_values(self, i):
+        x      = self.t
+        self.t += self.dt
+        y      = i
+        return x, y
+
+
+class RealTimeRandomDataProvider(RealTimeDataProvider):
+    def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Red'):
+        super(RealTimeRandomDataProvider, self).__init__(dt=dt, min_y=min_y, max_y=max_y, color=color)
+
+    def get_next_values(self, i):
+        x      = self.t
+        self.t += self.dt
+        return x, np.random.uniform(self.min_y, self.max_y)
+
+
+class RealTimeFunctionDataProvider(RealTimeDataProvider):
+    def __init__(self, dt=0.1, min_y=-1.2, max_y=1.2,function=np.sin, inc=np.radians(10), color='Red'):
+        self.function = function
+        self.inc      = inc
+        self.last_r   = 0.0
+        super(RealTimeFunctionDataProvider, self).__init__(dt=dt, min_y=min_y, max_y=max_y, color=color)
+
+    def get_next_values(self, i):
+        x      = self.t
+        self.t += self.dt
+        y = self.function(self.last_r)
+        self.last_r += self.inc
+        return x, y
+
+
 def graph_points_for_many_functions(function_name, number_of_points):
     msg = ''
     if function_name == 'Random':
