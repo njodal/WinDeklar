@@ -31,6 +31,9 @@ class RealTimeDataProvider(object):
 
 
 class RealTimeRandomDataProvider(RealTimeDataProvider):
+    """
+    Returns a random number between min_y and max_y
+    """
     def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Red'):
         super(RealTimeRandomDataProvider, self).__init__(dt=dt, min_y=min_y, max_y=max_y, color=color)
 
@@ -41,6 +44,10 @@ class RealTimeRandomDataProvider(RealTimeDataProvider):
 
 
 class RealTimeFunctionDataProvider(RealTimeDataProvider):
+    """
+    Returns the result of applying a given function (function)
+    """
+
     def __init__(self, dt=0.1, min_y=-1.2, max_y=1.2, function=np.sin, inc=np.radians(10), color='Red'):
         self.function = function
         self.inc      = inc
@@ -53,6 +60,20 @@ class RealTimeFunctionDataProvider(RealTimeDataProvider):
         y = self.function(self.last_r)
         self.last_r += self.inc
         return x, y
+
+
+class RealTimeConstantDataProvider(ga.RealTimeDataProvider):
+    def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Black'):
+        self.reference = 0.0
+        super(RealTimeConstantDataProvider, self).__init__(dt=dt, min_y=min_y, max_y=max_y, color=color)
+
+    def set_reference(self, new_reference):
+        self.reference = new_reference
+
+    def get_next_values(self, i):
+        x      = self.t
+        self.t += self.dt
+        return x, self.reference
 
 
 def graph_points_for_many_functions(function_name, number_of_points):

@@ -147,6 +147,7 @@ class FigureView(FigureCanvas):
         self.parent   = parent
         self.size_dim = size
         self.subtype  = subtype
+        self.anim     = None
         width, height = self.size_dim
         self.figure   = Figure(figsize=None)  # not necessary to set figsize
         self.axes     = self.figure.add_subplot(111)
@@ -193,10 +194,18 @@ class FigureView(FigureCanvas):
                                                 blit=False)
 
     def clear(self):
+        if self.anim is not None:
+            # in case of animation do not change axes limits, anim itself does it
+            return
+
         self.axes.clear()
         self.set_axis()
 
     def set_axis(self):
+        if self.anim is not None:
+            # in case of animation do not change axes limits, anim itself does it
+            return
+
         if self.scaled:
             self.axes.axis('scaled')
 
