@@ -192,3 +192,10 @@ def directory_path(file_name):
     :return:
     """
     return os.path.dirname(file_name)
+
+
+def get_file_name_with_other_extension(file_path, ext='yaml'):
+    dir_name      = os.path.dirname(os.path.abspath(file_path))
+    base_name     = file_name_without_extension(os.path.basename(file_path))
+    new_file_name = '%s/%s.%s' % (dir_name, base_name, ext)
+    return new_file_name

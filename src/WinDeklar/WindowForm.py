@@ -14,6 +14,11 @@ import WinDeklar.signal_aux as sg
 import WinDeklar.yaml_functions as yaml
 
 
+def set_winform(file_path, provider, ext='yaml'):
+    win_config_name = yaml.get_file_name_with_other_extension(file_path, ext)
+    return ConfigurableWindow(win_config_name, provider)
+
+
 class ConfigurableWindow(QtWidgets.QMainWindow):
     """
     Defines a Window with many components inside in a declarative manner in a config file

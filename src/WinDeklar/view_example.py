@@ -155,7 +155,6 @@ def progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2):
 
 if __name__ == '__main__':
     app = QTAux.def_app()
-    win_config_name = 'view_example.yaml'  # window definition
-    provider        = ExampleHost()        # class to handle events
-    myGUI           = WinForm.ConfigurableWindow(win_config_name, provider)
+    provider = ExampleHost()        # class to handle events
+    WinForm.set_winform(__file__, provider)
     sys.exit(app.exec_())
