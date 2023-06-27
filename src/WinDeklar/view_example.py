@@ -6,8 +6,8 @@ import time
 import WinDeklar.WindowForm as WinForm
 import WinDeklar.graph_aux as ga
 import WinDeklar.QTAux as QTAux
-import record as rc
-import yaml_functions
+import WinDeklar.record as rc
+import WinDeklar.yaml_functions as ya
 
 
 class ExampleHost(WinForm.HostModel):
@@ -104,7 +104,7 @@ class ExampleHost(WinForm.HostModel):
         :param progress_bar: use to give feedback about the opening process
         :return:
         """
-        file = yaml_functions.get_yaml_file(file_name, must_exist=True, verbose=True)
+        file = ya.get_yaml_file(file_name, must_exist=True, verbose=True)
         self.state.update(file['state'])
         print(self.state)
         self.refresh()
