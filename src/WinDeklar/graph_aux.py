@@ -3,7 +3,7 @@ import random
 import math
 import matplotlib.lines as mlines
 
-import points_box as pb
+import WinDeklar.points_box as pb
 
 
 class RealTimeDataProvider(object):
