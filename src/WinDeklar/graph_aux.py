@@ -62,7 +62,7 @@ class RealTimeFunctionDataProvider(RealTimeDataProvider):
         return x, y
 
 
-class RealTimeConstantDataProvider(ga.RealTimeDataProvider):
+class RealTimeConstantDataProvider(RealTimeDataProvider):
     def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Black'):
         self.reference = 0.0
         super(RealTimeConstantDataProvider, self).__init__(dt=dt, min_y=min_y, max_y=max_y, color=color)
