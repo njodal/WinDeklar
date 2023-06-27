@@ -4,7 +4,7 @@ from __future__ import print_function
 
 from datetime import datetime
 
-import yaml_functions as yaml
+import WinDeklar.yaml_functions as yaml
 
 
 class Record:

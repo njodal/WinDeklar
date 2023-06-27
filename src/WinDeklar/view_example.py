@@ -3,9 +3,9 @@
 import sys
 import time
 
-import WindowForm as WinForm
-import graph_aux as ga
-import QTAux
+import WinDeklar.WindowForm as WinForm
+import WinDeklar.graph_aux as ga
+import WinDeklar.QTAux as QTAux
 import record as rc
 import yaml_functions
 

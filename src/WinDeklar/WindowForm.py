@@ -7,11 +7,11 @@ from matplotlib import animation
 from PyQt5 import QtGui, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-import points_box
-import QTAux
-import record as rc
-import signal_aux as sg
-import yaml_functions as yaml
+import WinDeklar.points_box as pb
+import WinDeklar.QTAux as QTAux
+import WinDeklar.record as rc
+import WinDeklar.signal_aux as sg
+import WinDeklar.yaml_functions as yaml
 
 
 class ConfigurableWindow(QtWidgets.QMainWindow):
@@ -321,7 +321,7 @@ class SimpleFigure:
         self.ax.set_ylim([-size[1], size[1]])
         self.inc        = inc
         self.set_bounds = adjust_size
-        self.box_size   = points_box.PointsBox()
+        self.box_size   = pb.PointsBox()
 
     def resize(self, points):
         self.box_size.add_points(points)
@@ -423,7 +423,7 @@ class HostModel(object):
 
         self.state       = initial_values if initial_values is not None else {}
         self.main_window = None
-        self.box_size    = points_box.PointsBox()
+        self.box_size    = pb.PointsBox()
 
         self.zoom_center = None   # point where to center Zoom
         self.zoom_radius = 10.0   # radius around

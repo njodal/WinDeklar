@@ -3,9 +3,9 @@
 import sys
 import numpy as np
 
-import QTAux
-import WindowForm as WinForm
-import graph_aux as ga
+import WinDeklar.QTAux as QTAux
+import WinDeklar.WindowForm as WinForm
+import WinDeklar.graph_aux as ga
 
 
 class ExampleHost(WinForm.HostModel):

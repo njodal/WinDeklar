@@ -1,5 +1,5 @@
-from WindowForm import SimpleFigure
-import graph_aux as ga
+from WinDeklar.WindowForm import SimpleFigure
+import WinDeklar.graph_aux as ga
 
 
 def show_simple_window(title='Sine and Cosine graph', number_of_points=100, size=(5, 2),
