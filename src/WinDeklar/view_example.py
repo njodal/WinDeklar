@@ -52,6 +52,7 @@ class ExampleHost(WinForm.HostModel):
         show_axis = [True, True] if self.state.get(self.axis_key, True) else [False, False]
         ga.graph_points(ax, points, x_visible=show_axis[0], y_visible=show_axis[1],
                         line_width=self.state.get(self.width_key, 1.0))
+        self.resize_figure(ax, points)
 
     def redraw(self):
         """

@@ -3,8 +3,6 @@ import random
 import math
 import matplotlib.lines as mlines
 
-import WinDeklar.points_box as pb
-
 
 class RealTimeDataProvider(object):
     def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Red'):
@@ -90,10 +88,7 @@ def graph_points_for_many_functions(function_name, number_of_points):
     return points, msg
 
 
-def graph_points(ax, points, inc=1.1, scale_type='scaled', x_visible=True, y_visible=True, line_width=1.0,
-                 color='Blue'):
-    point_box = pb.PointsBox()
-    point_box.add_points(points)  # to calc bounds
+def graph_points(ax, points, scale_type='scaled', x_visible=True, y_visible=True, line_width=1.0, color='Blue'):
     ax.axis(scale_type)
     ax.get_xaxis().set_visible(x_visible)
     ax.get_yaxis().set_visible(y_visible)
@@ -107,7 +102,6 @@ def graph_points(ax, points, inc=1.1, scale_type='scaled', x_visible=True, y_vis
             line     = mlines.Line2D([first_point[0], x2], [first_point[1], y2], color=color, linewidth=line_width)
             ax.add_line(line)
             first_point = [x2, y2]
-    point_box.set_bounds(ax, inc)
 
 
 def random_function(from_x, to_x, min_y=0, max_y=10):
