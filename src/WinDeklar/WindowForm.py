@@ -216,6 +216,7 @@ class FigureView(FigureCanvas):
         self.axes.set_ybound(lower=self.y_lower, upper=self.y_upper)
         self.axes.get_xaxis().set_visible(self.x_visible)
         self.axes.get_yaxis().set_visible(self.y_visible)
+        self.axes.set_ylabel(' ', fontsize=20)  # quick fix to assure y values fit in the figure
 
     def onclick(self, event):
         self.parent.provider.on_mouse_click(event, self.axes, self)

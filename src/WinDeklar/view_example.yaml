@@ -100,7 +100,7 @@ window:
                           name:    line_width
                           title:   Line Width
                           type:    EditNumberSpin
-                          parms:   {step: 1.0}
+                          parms:   {step: 1.0, maximum: 10}
                           value:   1.0
                       - control:
                           name:    redraw
@@ -112,5 +112,5 @@ window:
                     name:    graph
                     type:    figure
                     subtype: graph
-                    view_size: [10, 10]
+                    view_size: [100, 10]
 
