@@ -122,6 +122,11 @@ class ScreenControl(object):
     def set_ename(self, new_ename):
         self.ename = new_ename
 
+    def set_fixed_width(self, width):
+        _, widget = self.get_widget()
+        if widget is not None:
+            widget.setFixedWidth(width)
+
 
 class EnumCombo(ScreenControl):
     def __init__(self, name, title, bound, enum, action, layout, tooltip=None):

@@ -77,6 +77,7 @@ window:
                     name:    controls
                     type:    grid
                     subtype: vertical
+                    width:   300
                     desc:    panel is composed of two sides, the one at the left has controls, at the right a Figure to show a grapth
                     controls:
                       - control:
@@ -119,7 +120,7 @@ window:
                           name:    graph1
                           type:    figure
                           subtype: graph
-                          title:   Graph a function
+                          # title:   Graph a function
                           desc:    graph example
                           x_axis:  {name: 'points'}
                           y_axis:  {name: 'output'}

@@ -3,8 +3,6 @@
 import sys
 import time
 
-import matplotlib.lines as mlines
-
 import WinDeklar.WindowForm as WinForm
 import WinDeklar.graph_aux as ga
 import WinDeklar.QTAux as QTAux
