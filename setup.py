@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='WinDeklar',
-    version='0.2.1',
+    version='0.2.2',
     description='Create winforms in an easy, declarative way. Specially suited for Robotics applications.',
     author='Nicolas Jodal',
     author_email='jnj@genexus.com',

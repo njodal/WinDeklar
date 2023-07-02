@@ -191,8 +191,8 @@ class FigureView(FigureCanvas):
 
         FigureCanvas.setSizePolicy(self, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
-        self.figure.tight_layout()
-        # self.figure.subplots_adjust(left=0.2, bottom=0.2, right=0.8, top=0.8, wspace=0.2, hspace=0.5)
+        # self.figure.tight_layout()
+        self.figure.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9)
 
         self.figure.canvas.mpl_connect('button_press_event', self.onclick)
         self.figure.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)

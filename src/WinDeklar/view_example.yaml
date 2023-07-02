@@ -120,7 +120,7 @@ window:
                           name:    graph1
                           type:    figure
                           subtype: graph
-                          # title:   Graph a function
+                          title:   Graph
                           desc:    graph example
                           x_axis:  {name: 'points'}
                           y_axis:  {name: 'output'}
