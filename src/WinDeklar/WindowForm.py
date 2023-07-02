@@ -14,17 +14,24 @@ import WinDeklar.signal_aux as sg
 import WinDeklar.yaml_functions as yaml
 
 
-def set_winform(file_path, provider, ext='yaml'):
-    win_config_name = yaml.get_file_name_with_other_extension(file_path, ext)
-    return ConfigurableWindow(win_config_name, provider)
+def run_winform(form_file_path, provider, ext='yaml'):
+    """
+    Given the file path of the program that handle the form logic, loads and exec the corresponding WinForm
+    :param form_file_path: most common value is __file__
+    :param provider:       subclass of HostModel
+    :param ext:            extension of the WinForm definition
+    :return:
+    """
+    win_config_name = yaml.get_file_name_with_other_extension(form_file_path, ext)
+    ConfigurableWindow(win_config_name, provider)
 
 
 class ConfigurableWindow(QtWidgets.QMainWindow):
     """
-    Defines a Window with many components inside in a declarative manner in a config file
+    Defines a WinForm with many components inside in a declarative manner in a config file
     Notes:
-        - a config_file_name is a yaml that has the definition (see view_map.yaml)
-        - a typical windows has some controls in the left and a Figure in the right (like an ego view or a map)
+        - a config_file_name is a yaml that has the definition (see view_example.yaml)
+        - a typical windows has some controls in the left and a Figure in the right (like a graph or a map)
     """
 
     def __init__(self, config_file_name, provider):
@@ -35,10 +42,10 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
         """
         super(ConfigurableWindow, self).__init__(parent=None)
 
-        self.controls = []
-        self.provider = provider
+        self.controls  = []
+        self.fig_views = []
+        self.provider  = provider
         self.provider.set_main_window(self)
-        self.fig_view = None
 
         self.win_config = get_win_config(config_file_name)
 
@@ -66,13 +73,12 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
             [c1, c2, c3, c4] = self.win_config['back_color']
             self.FRAME.setStyleSheet("QWidget { background-color: %s }" % QtGui.QColor(c1, c2, c3, c4).name())
         self.LAYOUT   = QtWidgets.QGridLayout()
-        self.fig_view = set_layout(self.LAYOUT, self.win_config.get('layout', []), self.controls, self, row_col=[0, 0])
+        self.fig_views, self.controls = set_layout(self.LAYOUT, self.win_config.get('layout', []), self, row_col=[0, 0])
         self.FRAME.setLayout(self.LAYOUT)
         self.setCentralWidget(self.FRAME)
 
         self.provider.initialize()
-        if self.fig_view:
-            self.fig_view.update_figure()
+        self.refresh()
         self.show()
 
     def get_control_value(self, name):
@@ -100,9 +106,8 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
         control.set_ename(new_title)
 
     def refresh(self):
-        if self.fig_view:
-            # initial values can be set before fig_view was created
-            self.fig_view.update_figure()
+        # initial values can be set before fig_view was created
+        [fig_view.update_figure() for fig_view in self.fig_views]
 
     def refresh_controls(self):
         for control in self.controls:
@@ -140,18 +145,36 @@ class FigureView(FigureCanvas):
     """
     Display a drawing that responds to a change in control values
     """
+    name_key        = 'name'
+    title_key       = 'title'
+    subtype_key     = 'subtype'
+    animation_key   = 'animation'
+    x_axis_key      = 'x_axis'
+    y_axis_key      = 'y_axis'
+    axes_limits_key = 'axes_limits'
 
-    def __init__(self, parent, size=(1, 1), axes_limits=None, subtype=None, scaled=True, x_visible=True,
-                 y_visible=True, animation_key='animation'):
+    def __init__(self, parent, config, size=(1, 1), scaled=True, x_visible=True, y_visible=True):
 
         self.parent   = parent
+        self.subtype  = config.get(self.subtype_key, None)
+        self.name     = config.get(self.name_key, 'no_name')
+        title         = config.get(self.title_key, None)
+
+        x_axis_def       = config.get(self.x_axis_key, {})
+        self.x_axis_name = x_axis_def.get(self.name_key, None)
+        y_axis_def       = config.get(self.y_axis_key, {})
+        self.y_axis_name = y_axis_def.get(self.name_key, None)
+
         self.size_dim = size
-        self.subtype  = subtype
         self.anim     = None
         width, height = self.size_dim
         self.figure   = Figure(figsize=None)  # not necessary to set figsize
         self.axes     = self.figure.add_subplot(111)
 
+        if title is not None:
+            self.figure.suptitle(title, fontsize='medium')
+
+        axes_limits = config.get(self.axes_limits_key, None)
         if axes_limits is None:
             self.x_lower, self.x_upper = [-width, width]
             self.y_lower, self.y_upper = [-height, height]
@@ -159,7 +182,7 @@ class FigureView(FigureCanvas):
             [self.x_lower, self.x_upper, self.y_lower, self.y_upper] = axes_limits
 
         self.x_visible, self.y_visible = [x_visible, y_visible]
-        self.scaled = False if self.subtype == animation_key else scaled
+        self.scaled = False if self.subtype == self.animation_key else scaled
 
         self.set_axis()
 
@@ -178,12 +201,12 @@ class FigureView(FigureCanvas):
         self.text_y = height  * dec
 
         # animation logic
-        self.graph_lines   = None  # to signal graph are not initialized yet
+        self.graph_lines   = None  # set to None to signal graph are not initialized yet
         self.data_provider = None
         self.graph_bounds  = None
         self.points_in_graph = 0
         self.anim_is_running = False
-        if self.subtype == animation_key:
+        if self.subtype == self.animation_key:
             interval, self.points_in_graph, self.graph_bounds, self.data_provider = \
                 self.parent.provider.get_data_provider()
             if self.data_provider is None:
@@ -193,6 +216,7 @@ class FigureView(FigureCanvas):
             self.anim = animation.FuncAnimation(self.figure, self.update_frame, frames=None, interval=interval,
                                                 blit=False)
 
+    # Drawing
     def clear(self):
         if self.anim is not None:
             # in case of animation do not change axes limits, anim itself does it
@@ -216,8 +240,20 @@ class FigureView(FigureCanvas):
         self.axes.set_ybound(lower=self.y_lower, upper=self.y_upper)
         self.axes.get_xaxis().set_visible(self.x_visible)
         self.axes.get_yaxis().set_visible(self.y_visible)
-        self.axes.set_ylabel(' ', fontsize=20)  # quick fix to assure y values fit in the figure
 
+        ylabel_name = self.y_axis_name if self.y_axis_name is not None else ' '
+        # assigning ' ' is a quick fix to assure y values fit in the figure
+        self.axes.set_ylabel(ylabel_name)
+        if self.x_axis_name is not None:
+            self.axes.set_xlabel(self.x_axis_name)
+
+    def update_figure(self):
+        self.clear()
+        self.parent.provider.update_view(self.name, self.axes)
+        self.parent.provider.apply_zoom()
+        self.draw()
+
+    # Events
     def onclick(self, event):
         self.parent.provider.on_mouse_click(event, self.axes, self)
         self.set_axis()
@@ -243,25 +279,7 @@ class FigureView(FigureCanvas):
         if update_figure:
             self.update_figure()
 
-    def update_figure(self):
-        self.clear()
-        self.parent.provider.update_view(self.axes)
-        self.parent.provider.apply_zoom()
-        self.draw()
-
-    def get_control_value(self, name):
-        return self.parent.provider.get_control_value(name)
-
-    def control_has_value(self, name):
-        return self.parent.provider.control_has_value(name)
-
-    def set_control_value(self, name, value):
-        # print('%s changed to %s' % (name, value))
-        self.parent.provider.set_control_value(name, value)
-        self.parent.refresh_other_widgets(name)
-        self.update_figure()
-
-    # animation methods
+    # Animation
     def update_frame(self, frame_number):
         # first time do initializations
         if self.graph_lines is None:
@@ -368,7 +386,7 @@ class Dialog(QtWidgets.QDialog):
         # Create FRAME
         self.FRAME = QtWidgets.QFrame(self)
         self.LAYOUT   = QtWidgets.QGridLayout()
-        self.fig_view = set_layout(self.LAYOUT, self.win_config.get('layout', []), self.controls, self, row_col=[0, 0])
+        self.fig_view, self.controls = set_layout(self.LAYOUT, self.win_config.get('layout', []), self, row_col=[0, 0])
         self.FRAME.setLayout(self.LAYOUT)
 
         self.provider.initialize()
@@ -453,6 +471,11 @@ class HostModel(object):
         self.main_window.refresh()
 
     def refresh_figure(self):
+        """
+        Update all the figures in WinForm, useful when some change in the logic change the figure
+        ex: when showing a map and a new path between two points in it is calculated
+        :return:
+        """
         if self.main_window is None:
             return
         self.main_window.fig_view.draw()
@@ -603,8 +626,14 @@ class HostModel(object):
             return
         self.main_window.show_status_bar_msg(msg)
 
-    def update_view(self, ax):
-        # abstract method
+    def update_view(self, name, ax):
+        """
+        Update view of a given Figure
+        Abstract method
+        :param name: name of the Figure
+        :param ax:   axis of the Figure
+        :return:
+        """
         pass
 
     # Zoom management
@@ -860,56 +889,57 @@ def get_title(win_config, provider, key='title'):
     return title
 
 
-def set_grid_layout(father_layout, subtype, layout_config, controls, window, row_col=None):
-    if subtype == 'vertical':
-        layout = QtWidgets.QVBoxLayout()
-    elif subtype == 'horizontal':
-        layout = QtWidgets.QHBoxLayout()
-    else:
-        raise Exception('Subtype %s not implemented for %s' % (subtype, type))
-    add_controls_to_window(layout, layout_config, controls, window)
-    if not row_col:
-        father_layout.addLayout(layout)
-    else:
-        father_layout.addLayout(layout, row_col[0], row_col[1])
-    return layout
-
-
-def set_layout(father_layout, layout_config, controls, window, row_col=None):
-    fig_view = None
+def set_layout(father_layout, layout_config, window, row_col=None):
+    fig_views = []
+    controls  = []
     if father_layout is None or not layout_config:
-        return fig_view
+        return fig_views, controls
     for sub_layout_config1 in layout_config:
         sub_layout_config = sub_layout_config1['item']
-        sub_layout, fig_view_sub = set_sub_layout(father_layout, sub_layout_config, controls, window, row_col)
+        sub_layout, fig_view_sub, sub_controls = set_layout_items(father_layout, sub_layout_config, window, row_col)
         if fig_view_sub is not None:
-            fig_view = fig_view_sub
-        fig_view1 = set_layout(sub_layout, sub_layout_config.get('layout', []), controls, window)
-        if fig_view1 is not None:
-            fig_view = fig_view1
-    return fig_view
+            fig_views.append(fig_view_sub)
+        controls.extend(sub_controls)
+        fig_views1, controls1 = set_layout(sub_layout, sub_layout_config.get('layout', []), window)
+        fig_views.extend(fig_views1)
+        controls.extend(controls1)
+    return fig_views, controls
 
 
-def set_sub_layout(father_layout, layout_config, controls, window, row_col=None):
+def set_layout_items(father_layout, layout_config, window, row_col=None):
     fig_view    = None
+    controls    = []
     layout_type = layout_config['type']
     subtype     = layout_config.get('subtype', None)
     if layout_type == 'grid':
-        layout = set_grid_layout(father_layout, subtype, layout_config, controls, window, row_col=row_col)
+        layout, controls = set_grid_layout(father_layout, subtype, layout_config, window, row_col=row_col)
     elif layout_type == 'figure':
         fig_view = set_figure_layout(father_layout, layout_config, window)
         layout   = None
     else:
         print('WARNING: layout type "%s" not implemented' % layout_type)
         layout = None
-    return layout, fig_view
+    return layout, fig_view, controls
 
 
-def set_figure_layout(father_layout, layout_config, window, key_axes='axes_limits', subtype_key='subtype'):
-    axes_limits = layout_config.get(key_axes, None)
-    subtype     = layout_config.get(subtype_key, None)
-    size        = window.provider.view_size() if window.provider is not None else (1, 0)
-    fig_view    = FigureView(window, size=size, axes_limits=axes_limits, subtype=subtype)
+def set_grid_layout(father_layout, subtype, layout_config, window, row_col=None):
+    if subtype == 'vertical':
+        layout = QtWidgets.QVBoxLayout()
+    elif subtype == 'horizontal':
+        layout = QtWidgets.QHBoxLayout()
+    else:
+        raise Exception('Subtype %s not implemented for %s' % (subtype, type))
+    controls = add_controls_to_window(layout, layout_config, window)
+    if not row_col:
+        father_layout.addLayout(layout)
+    else:
+        father_layout.addLayout(layout, row_col[0], row_col[1])
+    return layout, controls
+
+
+def set_figure_layout(father_layout, figure_config, window):
+    size     = window.provider.view_size() if window.provider is not None else (1, 0)
+    fig_view = FigureView(window, figure_config, size=size)
     father_layout.addWidget(fig_view)
     return fig_view
 
@@ -1041,9 +1071,9 @@ class GeneralProgressBar:
 
 
 # Controls definition
-def add_controls_to_window(layout, layout_config, controls, window):
+def add_controls_to_window(layout, layout_config, window):
     controls_config = layout_config.get('controls', [])
-    controls.extend(def_controls(controls_config, window.provider, layout))
+    return def_controls(controls_config, window.provider, layout)
 
 
 def def_controls(controls_definition, provider, layout):

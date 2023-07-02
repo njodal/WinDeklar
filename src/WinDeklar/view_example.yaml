@@ -85,11 +85,13 @@ window:
                           type:    Combo
                           values:  [Sine, Cosine, Random, Other]
                           value:   Random
+                          tooltip: Type of graph to show
                       - control:
                           name:    show_axis     # internal name (used in programs), if changed need to change program also
                           title:   Show Axis     # external name, can be changed without problem
                           type:    Check         # type of control: Check, Slider, Button, Combo
                           value:   True          # initial value
+                          tooltip: Whether show axis values
                       - control:
                           name:    points
                           title:   Number of points
@@ -109,8 +111,23 @@ window:
                           action:  redraw   # method to call
 
                 - item:
-                    name:    graph
-                    type:    figure
-                    subtype: graph
-                    view_size: [100, 10]
+                    name:    figures
+                    type:    grid
+                    subtype: vertical
+                    layout:
+                      - item:
+                          name:    graph1
+                          type:    figure
+                          subtype: graph
+                          title:   Graph a function
+                          desc:    graph example
+                          x_axis:  {name: 'points'}
+                          y_axis:  {name: 'output'}
+                          view_size: [100, 10]
+                      - item:
+                          name:    graph2
+                          type:    figure
+                          title:   Draw an arc from origin to the number of points
+                          desc:    a non graph example
+                          view_size: [100, 10]
 

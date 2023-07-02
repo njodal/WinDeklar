@@ -21,5 +21,8 @@ window:
               name:    graph
               type:    figure
               subtype: animation
+              title:   Animation of a graph
+              x_axis:  {name: 'time (s)'}
+              y_axis:  {name: 'radians'}
               view_size: [10, 10]
 

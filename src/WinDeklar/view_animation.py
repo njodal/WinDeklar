@@ -60,6 +60,6 @@ class ExampleHost(WinForm.HostModel):
 
 if __name__ == '__main__':
     app = QTAux.def_app()
-    provider = ExampleHost()        # class to handle events
-    WinForm.set_winform(__file__, provider)
+    provider = ExampleHost()        # class to handle the WinForm logic
+    WinForm.run_winform(__file__, provider)
     sys.exit(app.exec_())

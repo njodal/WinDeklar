@@ -3,6 +3,8 @@
 import sys
 import time
 
+import matplotlib.lines as mlines
+
 import WinDeklar.WindowForm as WinForm
 import WinDeklar.graph_aux as ga
 import WinDeklar.QTAux as QTAux
@@ -27,6 +29,8 @@ class ExampleHost(WinForm.HostModel):
         self.type_key   = 'graph_type'
         self.action_key = 'action'
         self.width_key  = 'line_width'
+        self.graph1_key = 'graph1'
+        self.graph2_key = 'graph2'
 
         # particular data
         self.action_name        = 'Action'
@@ -39,20 +43,39 @@ class ExampleHost(WinForm.HostModel):
         initial_values = {}  # used in case some control have an initial value programmatically
         super(ExampleHost, self).__init__(initial_values=initial_values)
 
-    def update_view(self, ax):
+    def control_changed(self, name, value):
+        """
+        Called when a control has changed it values
+        :param name:
+        :param value:
+        :return:
+        """
+        if name == self.type_key:
+            self.show_status_bar_msg('%s graph type chosen' % value)
+
+    def update_view(self, name, ax):
         """
         Update the figure
         Notes:
             - This method is called when any property changes or refresh() is used
             - All form variables are in dict self.state
+        :param name:
         :param ax:
         :return:
         """
-        points = self.get_graph_points()
-        show_axis = [True, True] if self.state.get(self.axis_key, True) else [False, False]
-        ga.graph_points(ax, points, x_visible=show_axis[0], y_visible=show_axis[1],
-                        line_width=self.state.get(self.width_key, 1.0))
-        self.resize_figure(ax, points)
+        if name == self.graph1_key:
+            function_name = self.state.get(self.type_key, 'None')
+            points        = self.get_graph_points(function_name)
+            show_axis     = [True, True] if self.state.get(self.axis_key, True) else [False, False]
+            ga.graph_points(ax, points, x_visible=show_axis[0], y_visible=show_axis[1],
+                            line_width=self.state.get(self.width_key, 1.0))
+            self.resize_figure(ax, points)
+        elif name == self.graph2_key:
+            number_of_points = int(self.state.get(self.points_key, 10))
+            p1 = [number_of_points, number_of_points]
+            p2 = [0, 0]
+            show_arrow(ax, p1, p2)
+            self.resize_figure(ax, [p1, p2])
 
     def redraw(self):
         """
@@ -133,12 +156,11 @@ class ExampleHost(WinForm.HostModel):
         msg = '%s saved' % file_name
         self.show_status_bar_msg(msg)
 
-    def get_graph_points(self):
+    def get_graph_points(self, function_name):
         """
         Returns the points (x,y) to be graphed depending on the graph type and number of points
         :return:
         """
-        function_name    = self.state.get(self.type_key, 'None')
         number_of_points = int(self.state.get(self.points_key, 10))
         points, msg      = ga.graph_points_for_many_functions(function_name, number_of_points)
         if points is None:
@@ -154,8 +176,16 @@ def progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2):
         time.sleep(sleep_time)
 
 
+def show_arrow(ax, p1, p2, color='Black', connectionstyle='arc3,rad=0.3'):
+    ax.annotate("", xy=p1, xycoords='data', xytext=p2, textcoords='data',
+                arrowprops=dict(arrowstyle="->", color=color, shrinkA=5, shrinkB=5, patchA=None, patchB=None,
+                                connectionstyle=connectionstyle,
+                                ),
+                )
+
+
 if __name__ == '__main__':
     app = QTAux.def_app()
-    provider = ExampleHost()        # class to handle events
-    WinForm.set_winform(__file__, provider)
+    provider = ExampleHost()        # class to handle form specific logic
+    WinForm.run_winform(__file__, provider)
     sys.exit(app.exec_())
