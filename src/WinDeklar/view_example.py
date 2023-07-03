@@ -51,24 +51,24 @@ class ExampleHost(WinForm.HostModel):
         if name == self.type_key:
             self.show_status_bar_msg('%s graph type chosen' % value)
 
-    def update_view(self, name, ax):
+    def update_view(self, figure, ax):
         """
         Update the figure
         Notes:
             - This method is called when any property changes or refresh() is used
             - All form variables are in dict self.state
-        :param name:
+        :param figure:
         :param ax:
         :return:
         """
-        if name == self.graph1_key:
+        if figure.name == self.graph1_key:
             function_name = self.state.get(self.type_key, 'None')
             points        = self.get_graph_points(function_name)
             show_axis     = [True, True] if self.state.get(self.axis_key, True) else [False, False]
             ga.graph_points(ax, points, x_visible=show_axis[0], y_visible=show_axis[1],
                             line_width=self.state.get(self.width_key, 1.0))
             self.resize_figure(ax, points)
-        elif name == self.graph2_key:
+        elif figure.name == self.graph2_key:
             number_of_points = int(self.state.get(self.points_key, 10))
             p1 = [number_of_points, number_of_points]
             p2 = [0, 0]

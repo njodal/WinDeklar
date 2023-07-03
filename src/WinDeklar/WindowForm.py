@@ -59,8 +59,9 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
             self.setMenuBar(menu_bar)
 
         # toolbar
-        toolbar = create_toolbar(self.win_config, self, self.provider, self.controls)
+        toolbar, toolbar_controls = create_toolbar(self.win_config, self, self.provider)
         if toolbar is not None:
+            self.controls.extend(toolbar_controls)
             self.addToolBar(toolbar)
 
         # Define the geometry of the main window
@@ -73,7 +74,9 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
             [c1, c2, c3, c4] = self.win_config['back_color']
             self.FRAME.setStyleSheet("QWidget { background-color: %s }" % QtGui.QColor(c1, c2, c3, c4).name())
         self.LAYOUT   = QtWidgets.QGridLayout()
-        self.fig_views, self.controls = set_layout(self.LAYOUT, self.win_config.get('layout', []), self, row_col=[0, 0])
+        self.fig_views, layout_controls = set_layout(self.LAYOUT, self.win_config.get('layout', []), self,
+                                                     row_col=[0, 0])
+        self.controls.extend(layout_controls)
         self.FRAME.setLayout(self.LAYOUT)
         self.setCentralWidget(self.FRAME)
 
@@ -133,6 +136,18 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
             if control.name == control_name:
                 return control
         return None
+
+    def anim_is_running(self):
+        for figure in self.fig_views:
+            if figure.anim_is_running:
+                return True
+        return False
+
+    def start_animations(self):
+        [figure.start_animation() for figure in self.fig_views]
+
+    def stop_animations(self):
+        [figure.stop_animation() for figure in self.fig_views]
 
     def show_status_bar_msg(self, msg):
         if self.statusbar is None:
@@ -209,7 +224,7 @@ class FigureView(FigureCanvas):
         self.anim_is_running = False
         if self.subtype == self.animation_key:
             interval, self.points_in_graph, self.graph_bounds, self.data_provider = \
-                self.parent.provider.get_data_provider()
+                self.parent.provider.get_data_provider(self)
             if self.data_provider is None:
                 raise Exception(
                     'Figure is defined as "animation" but not data provider is given, implement get_data_provider() '
@@ -250,7 +265,7 @@ class FigureView(FigureCanvas):
 
     def update_figure(self):
         self.clear()
-        self.parent.provider.update_view(self.name, self.axes)
+        self.parent.provider.update_view(self, self.axes)
         self.parent.provider.apply_zoom()
         self.draw()
 
@@ -627,11 +642,11 @@ class HostModel(object):
             return
         self.main_window.show_status_bar_msg(msg)
 
-    def update_view(self, name, ax):
+    def update_view(self, figure, ax):
         """
         Update view of a given Figure
         Abstract method
-        :param name: name of the Figure
+        :param figure: name of the Figure
         :param ax:   axis of the Figure
         :return:
         """
@@ -734,9 +749,10 @@ class HostModel(object):
         return {}
 
     # animation methods
-    def get_data_provider(self, interval=100, min_x=0.0, max_x=10.0, data_provider=None):
+    def get_data_provider(self, figure, interval=100, min_x=0.0, max_x=10.0, data_provider=None):
         """
         Abstract method
+        :param figure:   :type FigureView
         :param interval: time at which show new data (in milliseconds)
         :param max_x:    max value in the x-axis, values greater than this will cause the graph to scroll left
         :param min_x:    start value for the x-axis
@@ -748,14 +764,28 @@ class HostModel(object):
         max_points    = int(max_x/dt) + 1
         return interval, max_points, (min_x, max_x), data_provider
 
+    def start_stop_animation(self):
+        """
+        Logit to start/stop the graph with only one button (who changes its title depending on the graph is
+        running or not_
+        :return:
+        """
+        if self.anim_is_running():
+            self.stop_animation()
+            is_running = False
+        else:
+            self.start_animation()
+            is_running = True
+        return is_running
+
     def anim_is_running(self):
-        return self.main_window.fig_view.anim_is_running
+        return self.main_window.anim_is_running()
 
     def stop_animation(self):
-        self.main_window.fig_view.stop_animation()
+        self.main_window.stop_animations()
 
     def start_animation(self):
-        self.main_window.fig_view.start_animation()
+        self.main_window.start_animations()
 
 
 class PropertiesHost(HostModel):
@@ -976,10 +1006,12 @@ def create_menu_bar(config, main_window, provider, key='menu_bar'):
     return menu_bar
 
 
-def create_toolbar(config, main_window, provider, controls, key='toolbar', icon_key='icon', tooltip_key='tooltip',
+def create_toolbar(config, main_window, provider, key='toolbar', icon_key='icon', tooltip_key='tooltip',
                    combo_key='Combo', check_key='Check', type_key='type', label_key='Label', action_key='Action'):
+    controls = []
     if key not in config:
-        return None
+        return None, controls
+
     toolbar        = QtWidgets.QToolBar()
     toolbar_config = config[key]
     for item1 in toolbar_config:
@@ -1007,7 +1039,7 @@ def create_toolbar(config, main_window, provider, controls, key='toolbar', icon_
         else:
             raise Exception('%s is not implemented in Toolbar' % item_type)
 
-    return toolbar
+    return toolbar, controls
 
 
 def create_status_bar(win_config, main_window, status_key='status_bar'):

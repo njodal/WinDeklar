@@ -6,23 +6,29 @@ window:
   toolbar:
     - item:
         name:    start_stop_action
-        title:   Stop Animation
+        title:   Pause Animation
         type:    Action
-        action:  start_stop_animation
+        action:  start_stop
         tooltip: Click to start or stop the graph bellow
 
   layout:
     - item:
         name:    controls_and_figure
         type:    grid
-        subtype: horizontal
+        subtype: vertical
         layout:
           - item:
-              name:    graph
+              name:    graph1
               type:    figure
               subtype: animation
-              title:   Animation of a graph
+              title:   Sine function
               x_axis:  {name: 'time (s)'}
               y_axis:  {name: 'radians'}
-              view_size: [10, 10]
+          - item:
+              name:    graph2
+              type:    figure
+              subtype: animation
+              title:   Cosine function
+              x_axis:  {name: 'time (s)'}
+              y_axis:  {name: 'radians'}
 
