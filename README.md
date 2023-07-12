@@ -19,7 +19,7 @@ If you run `python view_example.py` the form is:
 In case a simple graph is needed look at `view_simple_graph.py`.
 # Examples
 
-## Form used to tune a PID controller for control a model car
+## Form used to visualize a PID controller for control the speed of a car
 
 <img width="999" alt="Screen Shot 2023-07-12 at 6 22 05 PM" src="https://github.com/njodal/WinDeklar/assets/28706901/93859f05-f9b6-4333-a451-34f5c302f8c1">
 
