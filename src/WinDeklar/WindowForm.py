@@ -1156,7 +1156,7 @@ def def_control(control1, provider, layout, main_key='control'):
     elif c_type == 'Check':
         result = True
         qt_control = QTAux.CheckButton(c_name, e_name, provider, action, layout, tooltip=tooltip)
-    elif c_type == 'Text':
+    elif c_type in ['Text', 'Label']:
         result = True
         qt_control = QTAux.Label(c_name, e_name, provider, action, layout)
     elif c_type == 'EditText':

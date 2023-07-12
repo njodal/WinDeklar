@@ -397,15 +397,13 @@ class Label(ScreenControl):
     def __init__(self, name, title, bound, action, layout, tooltip=None, align_left=True):
 
         # Widget must be created before calling super
-        self.text = QtWidgets.QLabel(title)
+        self.label_title = title
+        self.text        = QtWidgets.QLabel(title)
+        self.text.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         if align_left:
             self.text.setAlignment(QtCore.Qt.AlignLeft)
         bound.set_control_value_if_not_present(name, title)
         super(Label, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
-
-    def title(self):
-        # returns '' to avoid creating another Label
-        return ''
 
     def get_widget(self):
         return True, self.text
