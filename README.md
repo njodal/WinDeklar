@@ -6,7 +6,9 @@ While it can be used for all kinds of forms, it was created with the purpose of 
 The forms are defined in a declarative way in an YAML (layouts, controls, toolbar, menus, etc.) and used in a Python program with just a few lines of code.
 
 # How to use it
-The best way to learn how to use it is just take a look at the code.
+To create a WinForm it is necessary to create two files:
+* a declaration file (*.yaml) that define the WinForm (menu bar, toolbar, layouts, controls, etc.)
+* a python file (with the same name) that handles all the WinForm logic (events, drawing, etc.)
 
 For a complete form see `view_example.yaml` to understand how the form is defined and `view_example.py` how it is used.
 
