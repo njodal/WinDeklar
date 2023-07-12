@@ -566,8 +566,7 @@ class HostModel(object):
         if name in self.state:
             return self.state[name]
         else:
-            value = self.calculated_value(name)
-            return value if value is not None else 0
+            return self.calculated_value(name)
 
     def control_has_value(self, name):
         return name in self.state
@@ -729,8 +728,13 @@ class HostModel(object):
         return False
 
     def calculated_value(self, name):
+        """
+        Abstract method, used to return a value that is a formula of other values
+        :param name:
+        :return:
+        """
         # abstract method
-        return None
+        return 0.0
 
     def save_cycle(self):
         """

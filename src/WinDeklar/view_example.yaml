@@ -3,13 +3,15 @@ window:
   title: Example of a win form
   status_bar: True
 
+  # a window is defined by a menu_bar, tool_bar and layout components
+
   menu_bar:
     - item:
         name: File
         title: '&File'
         items:
           - item:
-              title: '&Open ...'
+              title: '&Open ...'                 # & defines the keyboard shortcut
               action: event_open_file            # method to call
           - item:
               title: '&Save'
@@ -62,78 +64,73 @@ window:
         action:  change_action
         tooltip: Click to change it
 
-  layout:
-    - item:
-        name:    main
-        type:    grid
-        subtype: vertical
-        layout:
-          - item:
-              name:    controls_and_figure
-              type:    grid
-              subtype: horizontal
-              layout:
-                - item:
-                    name:    controls
-                    type:    grid
-                    subtype: vertical
-                    width:   300
-                    desc:    panel is composed of two sides, the one at the left has controls, at the right a Figure to show a grapth
-                    controls:
-                      - control:
-                          name:    graph_type
-                          title:   Graph Type
-                          type:    Combo
-                          values:  [Sine, Cosine, Random, Other]
-                          value:   Random
-                          tooltip: Type of graph to show
-                      - control:
-                          name:    show_axis     # internal name (used in programs), if changed need to change program also
-                          title:   Show Axis     # external name, can be changed without problem
-                          type:    Check         # type of control: Check, Slider, Button, Combo
-                          value:   True          # initial value
-                          tooltip: Whether show axis values
-                      - control:
-                          name:    points
-                          title:   Number of points
-                          type:    Slider
-                          parms:   [2, 100, 1]      # [min_value, max_value, scale]
-                          value:   20
-                      - control:
-                          name:    line_width
-                          title:   Line Width
-                          type:    EditNumberSpin
-                          parms:   {step: 1.0, maximum: 10}
-                          value:   1.0
-                      - control:
-                          name:    just_text
-                          title:   ''  # null to avoid present it on the form
-                          type:    Text
-                          value:   Text
-                      - control:
-                          name:    redraw
-                          title:   Draw again
-                          type:    Button
-                          action:  redraw   # method to call
+  layout:       # defines the layout of the window
+      - item:
+          name:    controls_and_figure
+          type:    grid
+          subtype: horizontal          # sub items will be added in the horizontal axis
+          desc:    panel is composed of two sides, the one at the left has controls, at the right a Figure to show a graph
+          layout:                      # an item can have layouts inside
+            - item:
+                name:    controls
+                type:    grid
+                subtype: vertical      # sub items will be added in the vertical axis
+                width:   300
+                controls:              # an item can have UI controls inside (like combo, slide, etc)
+                  - control:
+                      name:    graph_type         # internal name, used in the program file
+                      title:   Graph Type         # title to be shown (use '' to not show)
+                      type:    Combo              # this is a ComboBox
+                      values:  [Sine, Cosine, Random, Other]  # valid values
+                      value:   Random                         # initial value
+                      tooltip: Type of graph to show          # message to show when the mouse is over the control
+                  - control:
+                      name:    show_axis     # internal name (used in programs), if changed need to change program also
+                      title:   Show Axis     # external name, can be changed without problem
+                      type:    Check         # type of control: Check, Slider, Button, Combo
+                      value:   True          # initial value
+                      tooltip: Whether show axis values
+                  - control:
+                      name:    points
+                      title:   Number of points
+                      type:    Slider
+                      parms:   [2, 100, 1]      # [min_value, max_value, scale]
+                      value:   20
+                  - control:
+                      name:    line_width
+                      title:   Line Width
+                      type:    EditNumberSpin
+                      parms:   {step: 1.0, maximum: 10}
+                      value:   1.0
+                  - control:
+                      name:    just_text
+                      title:   ''  # null to avoid present it on the form
+                      type:    Text
+                      value:   Text
+                  - control:
+                      name:    redraw
+                      title:   Draw again
+                      type:    Button
+                      action:  redraw   # method to call
 
-                - item:
-                    name:    figures
-                    type:    grid
-                    subtype: vertical
-                    layout:
-                      - item:
-                          name:    graph1
-                          type:    figure
-                          subtype: graph
-                          title:   Graph
-                          desc:    graph example
-                          x_axis:  {name: 'points'}
-                          y_axis:  {name: 'output'}
-                          view_size: [100, 10]
-                      - item:
-                          name:    graph2
-                          type:    figure
-                          title:   Draw an arc from origin to the number of points
-                          desc:    a non graph example
-                          view_size: [100, 10]
+            - item:
+                name:    figures
+                type:    grid
+                subtype: vertical
+                layout:
+                  - item:
+                      name:    graph1
+                      type:    figure               # show an image (like a graph or a drawing)
+                      subtype: graph
+                      title:   Graph
+                      desc:    graph example
+                      x_axis:  {name: 'points'}
+                      y_axis:  {name: 'output'}
+                      view_size: [100, 10]
+                  - item:
+                      name:    graph2
+                      type:    figure
+                      title:   Draw an arc from origin to the number of points
+                      desc:    a non graph example
+                      view_size: [100, 10]
 

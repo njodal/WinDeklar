@@ -21,7 +21,6 @@ class ExampleHost(WinForm.HostModel):
 
     def __init__(self, default_directory='/tmp', file_extension='yaml'):
         # keys (names used in the yaml definition file)
-        self.check1_key = 'check1'
         self.points_key = 'points'
         self.axis_key   = 'show_axis'
         self.type_key   = 'graph_type'
