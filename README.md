@@ -21,9 +21,7 @@ In case a simple graph is needed look at `view_simple_graph.py`.
 
 ## Form used to tune a PID controller for control a model car
 
-<img width="1003" alt="PID tuning" src="https://github.com/njodal/WIndow_form/assets/28706901/c978edfc-808b-47d4-993c-22d00b7fd154">
-
-
+<img width="999" alt="Screen Shot 2023-07-12 at 6 22 05 PM" src="https://github.com/njodal/WinDeklar/assets/28706901/93859f05-f9b6-4333-a451-34f5c302f8c1">
 
 
 
