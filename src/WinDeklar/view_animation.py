@@ -10,7 +10,7 @@ import WinDeklar.graph_aux as ga
 
 class ExampleHost(WinForm.HostModel):
     """
-    Shows tentacles
+    Shows a two animated graphs
     """
 
     def __init__(self, function1=np.sin, function2=np.cos, color='Blue', y_bounds=(-1.2, 1.2)):

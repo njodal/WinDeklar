@@ -81,6 +81,15 @@ class ExampleHost(WinForm.HostModel):
         """
         self.refresh()
 
+    def initialize(self):
+        """
+        Code to run when initializing the form
+        In this case it is shown how to set visible (or not) a control
+        :return:
+        """
+        control = self.get_control_by_name('just_text')
+        control.set_visible(True)
+
     # actions
     def event_open_file(self):
         """

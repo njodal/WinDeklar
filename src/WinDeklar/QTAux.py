@@ -127,6 +127,11 @@ class ScreenControl(object):
         if widget is not None:
             widget.setFixedWidth(width)
 
+    def set_visible(self, is_visible):
+        valid, widget = self.get_widget()
+        if valid:
+            widget.setVisible(is_visible)
+
 
 class EnumCombo(ScreenControl):
     def __init__(self, name, title, bound, enum, action, layout, tooltip=None):
