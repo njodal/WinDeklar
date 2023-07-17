@@ -87,8 +87,9 @@ class ExampleHost(WinForm.HostModel):
         In this case it is shown how to set visible (or not) a control
         :return:
         """
+        # example of how to conditional show a control in the screen
         control = self.get_control_by_name('just_text')
-        control.set_visible(True)
+        control.set_visible(False)
 
     # actions
     def event_open_file(self):

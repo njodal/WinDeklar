@@ -71,6 +71,7 @@ class ScreenControl(object):
         self.ename   = title
         self.bounded = bound
         self.action  = action
+        self.label   = None
 
         # print('control:%s bound:%s, action:%s' % (name, bound, action))
 
@@ -131,6 +132,8 @@ class ScreenControl(object):
         valid, widget = self.get_widget()
         if valid:
             widget.setVisible(is_visible)
+            if self.label is not None:
+                self.label.setVisible(is_visible)
 
 
 class EnumCombo(ScreenControl):
