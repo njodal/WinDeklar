@@ -37,10 +37,10 @@ class ExampleHost(WinForm.HostModel):
         self.file_filter        = '*.%s' % self.file_extension
         self.file_name          = None
 
-        initial_values = {}  # used in case some control have an initial value programmatically
+        initial_values = {}  # used in case some control needs to have an initial value programmatically
         super(ExampleHost, self).__init__(initial_values=initial_values)
 
-    def control_changed(self, name, value):
+    def widget_changed(self, name, value):
         """
         Called when a control has changed it values
         :param name:
@@ -55,24 +55,25 @@ class ExampleHost(WinForm.HostModel):
         Update the figure
         Notes:
             - This method is called when any property changes or refresh() is used
-            - All form variables are in dict self.state
+            - All form variables are accessible by get_value
         :param figure:
         :param ax:
         :return:
         """
         if figure.name == self.graph1_key:
-            function_name = self.state.get(self.type_key, 'None')
+            function_name = self.get_value(self.type_key)
             points        = self.get_graph_points(function_name)
-            show_axis     = [True, True] if self.state.get(self.axis_key, True) else [False, False]
+            show_axis     = [True, True] if self.get_value(self.axis_key) else [False, False]
             ga.graph_points(ax, points, x_visible=show_axis[0], y_visible=show_axis[1],
-                            line_width=self.state.get(self.width_key, 1.0))
-            self.resize_figure(ax, points)
+                            line_width=self.get_value(self.width_key, default=1.0))
+            figure.resize_axis(points)
         elif figure.name == self.graph2_key:
-            number_of_points = int(self.state.get(self.points_key, 10))
+            number_of_points = int(self.get_value(self.points_key, default=10))
             p1 = [number_of_points, number_of_points]
             p2 = [0, 0]
             show_arrow(ax, p1, p2)
-            self.resize_figure(ax, [p1, p2])
+            figure.show_text([['points', number_of_points]], position=[1, number_of_points])
+            figure.resize_axis([p1, p2])
 
     def redraw(self):
         """
@@ -88,7 +89,7 @@ class ExampleHost(WinForm.HostModel):
         :return:
         """
         # example of how to conditional show a control in the screen
-        control = self.get_control_by_name('just_text')
+        control = self.get_widget_by_name('just_text')
         control.set_visible(False)
 
     # actions
@@ -120,7 +121,7 @@ class ExampleHost(WinForm.HostModel):
     def change_action(self):
         self.last_action_number += 1
         value = '%s %s' % (self.action_name, self.last_action_number)
-        self.set_and_refresh_control(self.action_key, value)
+        self.set_and_refresh_widget(self.action_key, value)
 
     def on_mouse_move(self, event, ax):
         if event.xdata is None or event.ydata is None:
@@ -136,8 +137,8 @@ class ExampleHost(WinForm.HostModel):
         :return:
         """
         file = ya.get_yaml_file(file_name, must_exist=True, verbose=True)
-        self.state.update(file['state'])
-        print(self.state)
+        self.set_values(file['state'])
+        print(self._state)
         self.refresh()
 
         # just an example of how to use the ProgressBar, no actually needed in this case
@@ -155,7 +156,7 @@ class ExampleHost(WinForm.HostModel):
         """
         record = rc.Record(file_name, dir=None, add_time_stamp=False)
         record.write_ln('version: 1')  # just to avoid warnings with editing in pycharm
-        record.write_group('state', self.state, level=0)
+        record.write_group('state', self._state, level=0)
 
         # just an example of how to use the ProgressBar, no actually needed in this case
         progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2)
@@ -168,7 +169,7 @@ class ExampleHost(WinForm.HostModel):
         Returns the points (x,y) to be graphed depending on the graph type and number of points
         :return:
         """
-        number_of_points = int(self.state.get(self.points_key, 10))
+        number_of_points = int(self.get_value(self.points_key, default=10))
         points, msg      = ga.graph_points_for_many_functions(function_name, number_of_points)
         if points is None:
             self.show_status_bar_msg('%s not implemented' % function_name)

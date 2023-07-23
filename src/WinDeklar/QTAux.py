@@ -58,27 +58,27 @@ def set_progress_bar(host):
     return QtWidgets.QProgressBar(host)
 
 
-class ScreenControl(object):
+class ScreenWidget(object):
     """
-    Abstract class for any kind of input control like Sliders and Combos
+    Abstract class for any kind of screen widget like Sliders and Combos
     """
 
     def __init__(self, name, title, bound, action, layout, tooltip=None, label_height=20):
         # bound is the object responsible to keep the value, must implement:
-        #     get_control_value
-        #     set_control_value
+        #     get_value
+        #     set_widget_value
         self.name    = name
         self.ename   = title
         self.bounded = bound
         self.action  = action
         self.label   = None
 
-        # print('control:%s bound:%s, action:%s' % (name, bound, action))
+        # print('widget:%s bound:%s, action:%s' % (name, bound, action))
 
         self.bounded_name = 'self.bounded.'
  
-        is_widget, widget = self.get_widget()
-        if is_widget and layout is not None:
+        widget = self.get_widget()
+        if widget is not None and layout is not None:
             title = self.title()
             if title != '':
                 self.label = set_label(title, layout, height=label_height)  # must go after slider (see title())
@@ -90,14 +90,20 @@ class ScreenControl(object):
         self.refresh()
 
     def current_value(self):
-        return self.bounded.get_control_value(self.name)
+        return self.bounded.get_value(self.name)
 
     def title(self):
         return self.ename
 
     def changed(self):
+        """
+        Internal event triggered when user changes the widget on the form, does the following things:
+            - updates the internal value
+            - trigger any user defined action (useful for recalculate other values for example)
+        :return:
+        """
         # print('%s changed to %s (bounded:%s)' % (self.name, self.value(), self.bounded))
-        self.bounded.set_control_value(self.name, self.value())
+        self.bounded.set_value(self.name, self.value())
         self.exec_action()
 
     def exec_action(self):
@@ -110,7 +116,7 @@ class ScreenControl(object):
 
     def get_widget(self):
         # abstract method
-        return False, None
+        return None
 
     def value(self):
         # abstract method
@@ -124,19 +130,20 @@ class ScreenControl(object):
         self.ename = new_ename
 
     def set_fixed_width(self, width):
-        _, widget = self.get_widget()
+        widget = self.get_widget()
         if widget is not None:
             widget.setFixedWidth(width)
 
     def set_visible(self, is_visible):
-        valid, widget = self.get_widget()
-        if valid:
-            widget.setVisible(is_visible)
-            if self.label is not None:
-                self.label.setVisible(is_visible)
+        widget = self.get_widget()
+        if widget is None:
+            return
+        widget.setVisible(is_visible)
+        if self.label is not None:
+            self.label.setVisible(is_visible)
 
 
-class EnumCombo(ScreenControl):
+class EnumCombo(ScreenWidget):
     def __init__(self, name, title, bound, enum, action, layout, tooltip=None):
     
         self.enum  = enum
@@ -149,7 +156,7 @@ class EnumCombo(ScreenControl):
         super(EnumCombo, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
 
     def current_value(self):
-        e = self.bounded.get_control_value(self.name)
+        e = self.bounded.get_value(self.name)
         return e  # e.value
 
     def value(self):
@@ -160,15 +167,15 @@ class EnumCombo(ScreenControl):
         self.combo.setCurrentIndex(self.current_value())
 
     def changed_combo(self, i):
-        self.bounded.set_control_value(self.name, self.enum(i))
+        self.bounded.set_value(self.name, self.enum(i))
         self.exec_action()
 
     def get_widget(self):
-        return True, self.combo
+        return self.combo
 
 
-class Combo(ScreenControl):
-    def __init__(self, name, title, bound, action, layout, control_def, tooltip=None, values_key='values'):
+class Combo(ScreenWidget):
+    def __init__(self, name, title, bound, action, layout, widget_def, tooltip=None, values_key='values'):
         self.combo = QtWidgets.QComboBox(None)
 
         self.combo.currentTextChanged.connect(self.changed)
@@ -176,8 +183,8 @@ class Combo(ScreenControl):
 
         original_values         = []
         self.load_values_action = None
-        if values_key in control_def:
-            values1 = control_def[values_key]
+        if values_key in widget_def:
+            values1 = widget_def[values_key]
             if isinstance(values1, list):
                 original_values = values1
             else:
@@ -195,14 +202,14 @@ class Combo(ScreenControl):
         return self.combo.currentText()
 
     def get_widget(self):
-        return True, self.combo
+        return self.combo
 
     def refresh(self):
         # print('current value: %s of %s' % (self.current_value(), self.name))
         self.combo.setCurrentText(self.current_value())
 
 
-class Slider(ScreenControl):
+class Slider(ScreenWidget):
     def __init__(self, name, title, bound, min_value, max_value, action, layout, tooltip=None, scale=1):
 
         # Widget must be created before calling super
@@ -224,12 +231,12 @@ class Slider(ScreenControl):
 
     def changed(self):
         # print('set %s' % self.name)
-        self.bounded.set_control_value(self.name, self.value())
+        self.bounded.set_value(self.name, self.value())
         self.label.setText(self.title())
         self.exec_action()
 
     def get_widget(self):
-        return True, self.slider
+        return self.slider
 
     def value(self):
         value = float(self.slider.value())/self.vfactor  # integer to float scaling (slider only accept integers)
@@ -244,7 +251,7 @@ class Slider(ScreenControl):
         self.slider.setMaximum(max_value)
 
 
-class Button(ScreenControl):
+class Button(ScreenWidget):
     def __init__(self, name, title, bound, action, layout, tooltip=None, width=50, length=100):
 
         # Widget must be created before calling super
@@ -259,14 +266,14 @@ class Button(ScreenControl):
         self.exec_action()
 
     def get_widget(self):
-        return True, self.button
+        return self.button
 
     def set_ename(self, new_ename):
         self.ename = new_ename
         self.button.setText(self.ename)
 
 
-class CheckButton(ScreenControl):
+class CheckButton(ScreenWidget):
     def __init__(self, name, title, bound, action, layout, tooltip=None):
 
         # Widget must be created before calling super
@@ -282,13 +289,13 @@ class CheckButton(ScreenControl):
         return self.button.isChecked()
 
     def get_widget(self):
-        return True, self.button
+        return self.button
 
     def refresh(self):
         self.button.setChecked(self.current_value())
 
 
-class EditText(ScreenControl):
+class EditText(ScreenWidget):
     def __init__(self, name, title, bound, action, layout, tooltip=None):
         # Widget must be created before calling super
         self.edit_text = QtWidgets.QLineEdit()
@@ -296,7 +303,7 @@ class EditText(ScreenControl):
         super(EditText, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
 
     def get_widget(self):
-        return True, self.edit_text
+        return self.edit_text
 
     def value(self):
         value = self.edit_text.text()
@@ -306,7 +313,7 @@ class EditText(ScreenControl):
         self.edit_text.setText(str(self.current_value()))
 
 
-class EditNumber(ScreenControl):
+class EditNumber(ScreenWidget):
     def __init__(self, name, title, bound, action, layout, tooltip=None):
         # Widget must be created before calling super
         self.edit_text = QtWidgets.QLineEdit()
@@ -315,7 +322,7 @@ class EditNumber(ScreenControl):
         super(EditNumber, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
 
     def get_widget(self):
-        return True, self.edit_text
+        return self.edit_text
 
     def value(self):
         value = float(self.edit_text.text())
@@ -325,11 +332,11 @@ class EditNumber(ScreenControl):
         self.edit_text.setText(str(self.current_value()))
 
 
-class EditNumberSpin(ScreenControl):
-    def __init__(self, name, title, bound, action, layout, control_def, tooltip=None, parms_def='parms',
+class EditNumberSpin(ScreenWidget):
+    def __init__(self, name, title, bound, action, layout, widget_def, tooltip=None, parms_def='parms',
                  step_def='step', type_def='type', min_def='minimum', max_def='maximum'):
         # Widget must be created before calling super
-        parms = control_def.get(parms_def, {})
+        parms = widget_def.get(parms_def, {})
         is_integer = parms.get(type_def, 'float') == 'integer'
         self.edit_spin = QtWidgets.QSpinBox(None) if is_integer else QtWidgets.QDoubleSpinBox(None)
         if step_def in parms:
@@ -342,7 +349,7 @@ class EditNumberSpin(ScreenControl):
         super(EditNumberSpin, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
 
     def get_widget(self):
-        return True, self.edit_spin
+        return self.edit_spin
 
     def value(self):
         value = float(self.edit_spin.value())
@@ -357,7 +364,7 @@ class EditNumberSpin(ScreenControl):
         self.edit_spin.setMaximum(max_value)
 
 
-class MenuItem(ScreenControl):
+class MenuItem(ScreenWidget):
     def __init__(self, name, title, bound, action, layout, main_window, tooltip=None):
         # Widget must be created before calling super
         self.menu_item = QtWidgets.QAction(title, main_window)
@@ -366,10 +373,10 @@ class MenuItem(ScreenControl):
         super(MenuItem, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
 
     def get_widget(self):
-        return False, self.menu_item
+        return self.menu_item
 
 
-class Action(ScreenControl):
+class Action(ScreenWidget):
     """
     Wrapper for a QtAction, useful
     """
@@ -398,7 +405,7 @@ class Action(ScreenControl):
         self.qt_action.setText(self.ename)
 
 
-class Label(ScreenControl):
+class Label(ScreenWidget):
     """
     Read only text (also known as Label)
     """
@@ -410,18 +417,18 @@ class Label(ScreenControl):
         self.text.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         if align_left:
             self.text.setAlignment(QtCore.Qt.AlignLeft)
-        bound.set_control_value_if_not_present(name, title)
+        bound.set_value_if_not_present(name, title)
         super(Label, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
 
     def get_widget(self):
-        return True, self.text
+        return self.text
 
     def refresh(self):
         # print('current value:%s' % self.current_value())
         self.text.setText('%s' % self.current_value())
 
 
-class ProgressBar(ScreenControl):
+class ProgressBar(ScreenWidget):
     def __init__(self, name, bound, action, layout, tooltip=None):
 
         # Widget must be created before calling super
@@ -429,7 +436,7 @@ class ProgressBar(ScreenControl):
         super(ProgressBar, self).__init__(name, '', bound, action, layout, tooltip=tooltip)
 
     def get_widget(self):
-        return True, self.progress_bar
+        return self.progress_bar
 
     def get_maximum(self):
         return self.progress_bar.maximum()
@@ -454,7 +461,7 @@ class ProgressBar(ScreenControl):
         self.progress_bar.reset()
 
 
-class Constant(ScreenControl):
+class Constant(ScreenWidget):
     def __init__(self, name, title, bound, action, layout, tooltip=None):
         # it doesn't show anything, it is used for executing actions at initialization time
         super(Constant, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
@@ -465,8 +472,11 @@ class Constant(ScreenControl):
         return self.cte_value
 
     def get_widget(self):
-        # Don't add as widget
-        return False, 0
+        """
+        Constant don't have an associated widget
+        :return:
+        """
+        return None
 
 
 class Menu:

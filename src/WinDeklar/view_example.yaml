@@ -62,52 +62,52 @@ window:
         title:   Action
         type:    Action
         action:  change_action
-        tooltip: Click to change it
+        tooltip: Click to execute an action
 
   layout:       # defines the layout of the window
       - item:
-          name:    controls_and_figure
+          name:    widgets_and_figure
           type:    grid
           subtype: horizontal          # sub items will be added in the horizontal axis
-          desc:    panel is composed of two sides, the one at the left has controls, at the right a Figure to show a graph
+          desc:    panel is composed of two sides, the one at the left has widgets, at the right a Figure to show a graph
           layout:                      # an item can have layouts inside
             - item:
-                name:    controls
+                name:    widgets
                 type:    grid
                 subtype: vertical      # sub items will be added in the vertical axis
                 width:   300
-                controls:              # an item can have UI controls inside (like combo, slide, etc)
-                  - control:
+                widgets:              # an item can have UI widgets inside (like combo, slide, etc)
+                  - widget:
                       name:    graph_type         # internal name, used in the program file
                       title:   Graph Type         # title to be shown (use '' to not show)
                       type:    Combo              # this is a ComboBox
                       values:  [Sine, Cosine, Random, Other]  # valid values
                       value:   Random                         # initial value
-                      tooltip: Type of graph to show          # message to show when the mouse is over the control
-                  - control:
+                      tooltip: Type of graph to show          # message to show when the mouse is over the widget
+                  - widget:
                       name:    show_axis     # internal name (used in programs), if changed need to change program also
                       title:   Show Axis     # external name, can be changed without problem
-                      type:    Check         # type of control: Check, Slider, Button, Combo
+                      type:    Check         # type of widget: Check, Slider, Button, Combo
                       value:   True          # initial value
                       tooltip: Whether show axis values
-                  - control:
+                  - widget:
                       name:    points
                       title:   Number of points
                       type:    Slider
                       parms:   [2, 100, 1]      # [min_value, max_value, scale]
                       value:   20
-                  - control:
+                  - widget:
                       name:    line_width
                       title:   Line Width
                       type:    EditNumberSpin
                       parms:   {step: 1.0, maximum: 10}
                       value:   1.0
-                  - control:
+                  - widget:
                       name:    just_text
                       title:   ''  # null to avoid present it on the form
                       type:    Text
                       value:   Text
-                  - control:
+                  - widget:
                       name:    redraw
                       title:   Draw again
                       type:    Button
@@ -131,6 +131,7 @@ window:
                       name:    graph2
                       type:    figure
                       title:   Draw an arc from origin to the number of points
+                      text_position: [2, 10]
                       desc:    a non graph example
                       view_size: [100, 10]
 

@@ -10,7 +10,7 @@ import WinDeklar.graph_aux as ga
 
 class ExampleHost(WinForm.HostModel):
     """
-    Shows a two animated graphs
+    Shows two animated graphs
     """
 
     def __init__(self, function1=np.sin, function2=np.cos, color='Blue', y_bounds=(-1.2, 1.2)):
@@ -62,11 +62,11 @@ class ExampleHost(WinForm.HostModel):
         """
         is_running = self.start_stop_animation()
         if is_running:
-            self.set_control_title(self.start_stop_key, 'Pause Animation')
-            self.set_control_title(self.start_stop_action_key, 'Pause Animation')
+            self.set_widget_title(self.start_stop_key, 'Pause Animation')
+            self.set_widget_title(self.start_stop_action_key, 'Pause Animation')
         else:
-            self.set_control_title(self.start_stop_key, 'Restart Animation')
-            self.set_control_title(self.start_stop_action_key, 'Restart Animation')
+            self.set_widget_title(self.start_stop_key, 'Restart Animation')
+            self.set_widget_title(self.start_stop_action_key, 'Restart Animation')
 
 
 if __name__ == '__main__':

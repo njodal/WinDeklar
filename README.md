@@ -3,11 +3,11 @@ A simple, declarative oriented framework to create WinForms in Python.
 
 While it can be used for all kinds of forms, it was created with the purpose of being applied in Robotics, where the need to visualize complex algorithms and, above all, observe the effect of parameter changes is very common.
 
-The forms are defined in a declarative way in an YAML (layouts, controls, toolbar, menus, etc.) and used in a Python program with just a few lines of code.
+The forms are defined in a declarative way in an YAML (layouts, widgets, toolbar, menus, etc.) and used in a Python program with just a few lines of code.
 
 # How to use it
 To create a WinForm it is necessary to create two files:
-* a declaration file (*.yaml) that define the WinForm (menu bar, toolbar, layouts, controls, etc.)
+* a declaration file (*.yaml) that define the WinForm (menu bar, toolbar, layouts, widgets, etc.)
 * a python file (with the same name) that handles all the WinForm logic (events, drawing, etc.)
 
 For a complete form see `view_example.yaml` to understand how the form is defined and `view_example.py` how it is used.
