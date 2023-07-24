@@ -90,7 +90,15 @@ class ScreenWidget(object):
         self.refresh()
 
     def current_value(self):
-        return self.bounded.get_value(self.name)
+        value = self.bounded.get_value(self.name)
+        return value if value is not None else self.default_value()
+
+    def default_value(self):
+        """
+        Default value may depend on the widget (ex: EditNumber should be 0.0)
+        :return:
+        """
+        return None
 
     def title(self):
         return self.ename
@@ -155,10 +163,6 @@ class EnumCombo(ScreenWidget):
 
         super(EnumCombo, self).__init__(name, title, bound, action, layout, tooltip=tooltip)
 
-    def current_value(self):
-        e = self.bounded.get_value(self.name)
-        return e  # e.value
-
     def value(self):
         value = self.enum(self.combo.currentIndex())
         return value
@@ -201,6 +205,9 @@ class Combo(ScreenWidget):
     def value(self):
         return self.combo.currentText()
 
+    def default_value(self):
+        return ' '
+
     def get_widget(self):
         return self.combo
 
@@ -241,6 +248,9 @@ class Slider(ScreenWidget):
     def value(self):
         value = float(self.slider.value())/self.vfactor  # integer to float scaling (slider only accept integers)
         return value
+
+    def default_value(self):
+        return 0.0
 
     def refresh(self):
         self.slider.setValue(self.current_value()*self.vfactor)
@@ -285,8 +295,15 @@ class CheckButton(ScreenWidget):
     def title(self):
         return ''  # button don't have title label
 
+    def current_value(self):
+        value = self.bounded.get_value(self.name)
+        return value if value is not None else False
+
     def value(self):
         return self.button.isChecked()
+
+    def default_value(self):
+        return False
 
     def get_widget(self):
         return self.button
@@ -309,6 +326,9 @@ class EditText(ScreenWidget):
         value = self.edit_text.text()
         return value
 
+    def default_value(self):
+        return ' '
+
     def refresh(self):
         self.edit_text.setText(str(self.current_value()))
 
@@ -327,6 +347,9 @@ class EditNumber(ScreenWidget):
     def value(self):
         value = float(self.edit_text.text())
         return value
+
+    def default_value(self):
+        return 0
 
     def refresh(self):
         self.edit_text.setText(str(self.current_value()))
@@ -354,6 +377,9 @@ class EditNumberSpin(ScreenWidget):
     def value(self):
         value = float(self.edit_spin.value())
         return value
+
+    def default_value(self):
+        return 0.0
 
     def refresh(self):
         self.edit_spin.setValue(self.current_value())
@@ -422,6 +448,9 @@ class Label(ScreenWidget):
 
     def get_widget(self):
         return self.text
+
+    def default_value(self):
+        return ' '
 
     def refresh(self):
         # print('current value:%s' % self.current_value())
