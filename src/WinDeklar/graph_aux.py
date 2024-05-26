@@ -5,12 +5,24 @@ import matplotlib.lines as mlines
 
 
 class RealTimeDataProvider(object):
+    """
+    Base class used displaying data in an animated graph
+    """
+
     def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Red'):
+        """
+
+        :param dt:     delta time to increase in each cycle
+        :param min_y:  min value in the y-axis
+        :param max_y:  max value in the y-axis
+        :param color:  color of the line in the graph
+        """
+
         self.min_y = min_y
         self.max_y = max_y
         self.color = color
         self.dt    = dt
-        self.t     = 0.0
+        self.t     = 0.0     # current time
 
     def get_bounds(self):
         return self.min_y, self.max_y
@@ -22,6 +34,11 @@ class RealTimeDataProvider(object):
         return self.max_y
 
     def get_next_values(self, i):
+        """
+        Returns the next point in the graph
+        :param i: number of iteration :type integer
+        :return:  next point (x, y)
+        """
         x      = self.t
         self.t += self.dt
         y      = i
@@ -30,8 +47,9 @@ class RealTimeDataProvider(object):
 
 class RealTimeRandomDataProvider(RealTimeDataProvider):
     """
-    Returns a random number between min_y and max_y
+    Returns a random number between min_y and max_y each time
     """
+
     def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Red'):
         super(RealTimeRandomDataProvider, self).__init__(dt=dt, min_y=min_y, max_y=max_y, color=color)
 
@@ -43,7 +61,7 @@ class RealTimeRandomDataProvider(RealTimeDataProvider):
 
 class RealTimeFunctionDataProvider(RealTimeDataProvider):
     """
-    Returns the result of applying a given function (function)
+    Returns the result of applying a given function
     """
 
     def __init__(self, dt=0.1, min_y=-1.2, max_y=1.2, function=np.sin, inc=np.radians(10), color='Red'):
@@ -61,6 +79,9 @@ class RealTimeFunctionDataProvider(RealTimeDataProvider):
 
 
 class RealTimeConstantDataProvider(RealTimeDataProvider):
+    """
+    Returns a constant value every time (but can be changed with sef_reference)
+    """
     def __init__(self, dt=0.1, min_y=0.0, max_y=10.0, color='Black'):
         self.reference = 0.0
         super(RealTimeConstantDataProvider, self).__init__(dt=dt, min_y=min_y, max_y=max_y, color=color)

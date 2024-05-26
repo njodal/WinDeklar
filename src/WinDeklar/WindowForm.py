@@ -23,7 +23,8 @@ def run_winform(form_file_path, provider, ext='yaml'):
     :return:
     """
     win_config_name = yaml.get_file_name_with_other_extension(form_file_path, ext)
-    ConfigurableWindow(win_config_name, provider)
+    win_config      = get_win_config(win_config_name)
+    ConfigurableWindow(win_config, provider)
 
 
 class ConfigurableWindow(QtWidgets.QMainWindow):
@@ -34,10 +35,10 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
         - a typical windows has some widgets in the left and a Figure in the right (like a graph or a map)
     """
 
-    def __init__(self, config_file_name, provider):
+    def __init__(self, win_config, provider):
         """
         Init
-        :param config_file_name: name of the file containing the window definition
+        :param win_config: dict containing the window definition
         :param provider: handles all the form logic, usually a subclass of HostModel
         """
         super(ConfigurableWindow, self).__init__(parent=None)
@@ -47,7 +48,7 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
         self.provider  = provider
         self.provider.set_main_window(self)
 
-        self.win_config = get_win_config(config_file_name)
+        self.win_config = win_config
 
         # status bar logic
         self.statusbar    = create_status_bar(self.win_config, self)
