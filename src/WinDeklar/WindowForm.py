@@ -1216,24 +1216,24 @@ def def_widget(widget1, provider, layout, main_key='widget'):
         qt_widget = QTAux.Combo(c_name, e_name, provider, action, layout, widget, tooltip=tooltip)
     elif c_type == 'EnumCombo':
         enum       = eval(widget['enum'])
-        qt_widget = QTAux.EnumCombo(c_name, e_name, provider, enum, action, layout)
+        qt_widget = QTAux.EnumCombo(c_name, e_name, provider, enum, action, layout, tooltip=tooltip)
         # qt_widget = def_enum_combo(c_name, e_name, provider, layout, action, widget)
     elif c_type == 'Button':
         qt_widget = def_button(c_name, e_name, provider, layout, action, widget, tooltip=tooltip)
     elif c_type == 'Constant':
-        qt_widget = def_constant(c_name, e_name, provider, layout, action)
+        qt_widget = def_constant(c_name, e_name, provider, layout, action, tooltip=tooltip)
     elif c_type == 'Check':
         qt_widget = QTAux.CheckButton(c_name, e_name, provider, action, layout, tooltip=tooltip)
     elif c_type in ['Text', 'Label']:
-        qt_widget = QTAux.Label(c_name, e_name, provider, action, layout)
+        qt_widget = QTAux.Label(c_name, e_name, provider, action, layout, tooltip=tooltip)
     elif c_type == 'EditText':
         qt_widget = QTAux.EditText(c_name, e_name, provider, action, layout, tooltip=tooltip)
     elif c_type == 'EditNumber':
-        qt_widget = QTAux.EditNumber(c_name, e_name, provider, action, layout)
+        qt_widget = QTAux.EditNumber(c_name, e_name, provider, action, layout, tooltip=tooltip)
     elif c_type == 'EditNumberSpin':
-        qt_widget = QTAux.EditNumberSpin(c_name, e_name, provider, action, layout, widget)
+        qt_widget = QTAux.EditNumberSpin(c_name, e_name, provider, action, layout, widget, tooltip=tooltip)
     elif c_type == 'ProgressBar':
-        qt_widget = QTAux.ProgressBar(c_name, provider, action, layout)
+        qt_widget = QTAux.ProgressBar(c_name, provider, action, layout, tooltip=tooltip)
     else:
         raise Exception('Widget type "%s" not implemented' % c_type)
 
@@ -1268,10 +1268,10 @@ def def_button(c_name, e_name, provider, layout, action, widget, tooltip=None, d
         raise Exception('Invalid button definition, no action defined')
 
 
-def def_constant(c_name, e_name, provider, layout, action):
+def def_constant(c_name, e_name, provider, layout, action, tooltip=None):
     # Only reason to have a constant on window is to exec an action
     if action != '':
-        QTAux.Constant(c_name, e_name, provider, action, layout)
+        QTAux.Constant(c_name, e_name, provider, action, layout, tooltip=tooltip)
     else:
         raise Exception('Invalid constant definition, no action defined')
 

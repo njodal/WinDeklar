@@ -96,12 +96,14 @@ window:
                       type:    Slider
                       parms:   [2, 100, 1]      # [min_value, max_value, scale]
                       value:   20
+                      tooltip: Length of the X axis
                   - widget:
                       name:    line_width
                       title:   Line Width
                       type:    EditNumberSpin
                       parms:   {step: 1.0, maximum: 10}
                       value:   1.0
+                      tooltip: Width of the graph line
                   - widget:
                       name:    just_text
                       title:   ''  # null to avoid present it on the form
@@ -112,6 +114,7 @@ window:
                       title:   Draw again
                       type:    Button
                       action:  redraw   # method to call
+                      tooltip: Press button to draw the graph again
 
             - item:
                 name:    figures
