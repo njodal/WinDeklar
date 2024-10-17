@@ -44,7 +44,7 @@ class ExampleHost(WinForm.HostModel):
         elif figure.name == self.graph2_key:
             function = self.function2
         else:
-            raise Exception('"%s" graph name not implemented (valids are %s and %s)' %
+            raise Exception('"%s" graph name not implemented (valid are %s and %s)' %
                             (figure.name, self.graph1_key, self.graph2_key))
 
         dt             = interval/1000  # seconds
