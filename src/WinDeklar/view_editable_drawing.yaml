@@ -1,0 +1,145 @@
+window:
+  size: [100, 50, 1000, 500]  # [start_x, start_y, width, height]
+  title: Example of a editable drawing
+  status_bar: True
+
+  # a window is defined by a menu_bar, tool_bar and layout components
+
+  menu_bar:
+    - item:
+        name: File
+        title: '&File'
+        items:
+          - item:
+              title: '&Open ...'                 # & defines the keyboard shortcut
+              action: event_open_file            # method to call
+          - item:
+              title: '&Save'
+              action: event_save_file_as
+          - item:
+              title: 'Save as ...'
+              action: event_save_file_as
+          - item:
+              is_separator: True
+          - item:
+              title: 'Item after separator'
+    - item:
+        name: View
+        title: '&View'
+        type: menu_item
+        items:
+          - item:
+              title: 'Item1'
+          - item:
+              title: 'Item2'
+
+  toolbar:
+    - item:
+        icon:    SP_DialogSaveButton
+        tooltip: Save
+        title:  ' &Save '
+        action: event_save_file
+    - item:
+        title: 'Save As ...'
+        action: event_save_file_as
+    - item:
+        is_separator: True
+    - item:
+        title: '>'
+        tooltip: Advance one step
+    - item:
+        title: '>>'
+        tooltip: Advance fast
+    - item:
+        title: '>>>'
+        tooltip: Advance faster
+    - item:
+        title: '>|'
+        tooltip: Advance to last step
+        # action: button_next_last
+    - item:
+        name:    action
+        title:   Action
+        type:    Action
+        action:  change_action
+        tooltip: Click to execute an action
+
+  layout:       # defines the layout of the window
+      - item:
+          name:    widgets_and_figure
+          type:    grid
+          subtype: horizontal          # sub items will be added in the horizontal axis
+          desc:    panel is composed of two sides, the one at the left has widgets, at the right a Figure to show a graph
+          layout:                      # an item can have layouts inside
+            - item:
+                name:    widgets
+                type:    grid
+                subtype: vertical      # sub items will be added in the vertical axis
+                width:   300
+                widgets:              # an item can have UI widgets inside (like combo, slide, etc)
+                  - widget:
+                      name:    clear
+                      title:   Clear
+                      type:    Button
+                      action:  clear   # method to call
+                      tooltip: Delete all items
+                  - widget:
+                      name:    delete
+                      title:   Delete
+                      type:    Button
+                      action:  delete_selected_items   # method to call
+                      tooltip: Delete selected items
+                  - widget:
+                      name:    graph_type         # internal name, used in the program file
+                      title:   Graph Type         # title to be shown (use '' to not show)
+                      type:    Combo              # this is a ComboBox
+                      values:  [Sine, Cosine, Random, Other]  # valid values
+                      value:   Random                         # initial value
+                      tooltip: Type of graph to show          # message to show when the mouse is over the widget
+                  - widget:
+                      name:    show_axis     # internal name (used in programs), if changed need to change program also
+                      title:   Show Axis     # external name, can be changed without problem
+                      type:    Check         # type of widget: Check, Slider, Button, Combo
+                      value:   True          # initial value
+                      tooltip: Whether show axis values
+                  - widget:
+                      name:    points
+                      title:   Number of points
+                      type:    Slider
+                      parms:   [2, 100, 1]      # [min_value, max_value, scale]
+                      value:   20
+                      tooltip: Length of the X axis
+                  - widget:
+                      name:    line_width
+                      title:   Line Width
+                      type:    EditNumberSpin
+                      parms:   {step: 1.0, maximum: 10}
+                      value:   1.0
+                      tooltip: Width of the graph line
+                  - widget:
+                      name:    just_text
+                      title:   ''  # null to avoid present it on the form
+                      type:    Text
+                      value:   Text
+                  - widget:
+                      name:    redraw
+                      title:   Draw again
+                      type:    Button
+                      action:  redraw   # method to call
+                      tooltip: Press button to draw the graph again
+
+            - item:
+                name:    figures
+                type:    grid
+                subtype: vertical
+                layout:
+                  - item:
+                      name:    graph1
+                      type:    figure               # show an image (like a graph or a drawing)
+                      subtype: editable
+                      title:   Editable drawing
+                      desc:    Editable drawing example
+                      x_axis:  {name: 'points'}
+                      y_axis:  {name: 'output'}
+                      view_size: [100, 50]
+

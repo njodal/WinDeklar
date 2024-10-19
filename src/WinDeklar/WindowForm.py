@@ -7,6 +7,7 @@ from matplotlib import animation
 from PyQt5 import QtGui, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+from EditableScene import EditableFigure
 import WinDeklar.points_box as pb
 import WinDeklar.QTAux as QTAux
 import WinDeklar.record as rc
@@ -1024,7 +1025,7 @@ def set_layout_items(father_layout, layout_config, window, row_col=None):
     if layout_type == 'grid':
         layout, widgets = set_grid_layout(father_layout, subtype, layout_config, window, row_col=row_col)
     elif layout_type == 'figure':
-        fig_view = set_figure_layout(father_layout, layout_config, window)
+        fig_view = set_figure_layout(father_layout, layout_config, window, subtype)
         layout   = None
     else:
         print('WARNING: layout type "%s" not implemented' % layout_type)
@@ -1052,8 +1053,11 @@ def set_grid_layout(father_layout, subtype, layout_config, window, row_col=None)
     return layout, widgets
 
 
-def set_figure_layout(father_layout, figure_config, window):
-    fig_view = FigureView(window, figure_config)
+def set_figure_layout(father_layout, figure_config, window, subtype):
+    if subtype == 'editable':
+        fig_view = EditableFigure(window, figure_config)
+    else:
+        fig_view = FigureView(window, figure_config)
     father_layout.addWidget(fig_view)
     return fig_view
 
