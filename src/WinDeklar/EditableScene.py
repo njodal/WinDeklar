@@ -1,6 +1,6 @@
 import math
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, \
-    QGraphicsItem, QGraphicsLineItem, QGraphicsPolygonItem
+    QGraphicsItem, QGraphicsLineItem, QGraphicsPolygonItem, QGraphicsItemGroup, QGraphicsRectItem
 from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF
 from PyQt5.QtGui import QPen, QColor, QPolygonF
 
@@ -57,9 +57,7 @@ class EditableFigure(QGraphicsView):
     # events
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
-            print("Clic derecho detectado")
-        # elif event.button() == Qt.LeftButton:
-        #    print("Clic izquierdo detectado")
+            print("Right click")
         super().mousePressEvent(event)
 
     def wheelEvent(self, event):
@@ -158,30 +156,30 @@ class SceneLine(QGraphicsLineItem):
         """
         self.handles       = []
         self.scale_factor  = scale_factor
-        self.name          = ''
+        self.name          = name
         start_point_pixels = point_to_pixel_point(start_point, self.scale_factor)
         end_point_pixels   = point_to_pixel_point(end_point, self.scale_factor)
         line               = QLineF(start_point_pixels, end_point_pixels)
         super().__init__(line)
-        self.setFlag(QGraphicsItem.ItemIsMovable)
+
+        # flags
+        # self.setFlag(QGraphicsItem.ItemIsMovable)
+        self.setAcceptHoverEvents(True)
         # self.setFlag(QGraphicsItem.ItemIsSelectable)
 
         if self.name != '':
-            # ToDo: not working, tooltip doesn't appear
             self.setToolTip(self.name)
 
-        self.is_resizing  = False
-        handle_start      = EnlargeHandle(self, True, self.scale_factor)     # enlarge start point
-        handle_end        = EnlargeHandle(self, False, self.scale_factor)    # enlarge end point
-        handle_start_move = RotateHandle(self, True, self.scale_factor)      # rotate around end point
-        handle_end_move   = RotateHandle(self, False, self.scale_factor)     # rotate around start point
-        self.handles = [handle_start, handle_end, handle_start_move, handle_end_move]
+        self.handles = []  # handles are created only when the item is clicked
 
     def p1(self):
         return self.line().p1()
 
     def p2(self):
         return self.line().p2()
+
+    def central_point(self):
+        return middle_pixel_point(self.p1(), self.p2())
 
     def start_point(self):
         return pixel_point_to_point(self.p1(), self.scale_factor, self.pos())
@@ -196,6 +194,7 @@ class SceneLine(QGraphicsLineItem):
         """
         return distance_in_pixels(self.p1(), self.p2())
 
+    # update
     def update_line_end_point(self, is_start, new_pos):
         """
         Update one of the line end points depending on the is_start flag
@@ -206,38 +205,110 @@ class SceneLine(QGraphicsLineItem):
         p1, p2 = [new_pos, self.p2()] if is_start else [self.p1(), new_pos]
         self.setLine(QLineF(p1, p2))
 
-    # handles
-    def stick_to_line_handles(self):
-        for handle in self.handles:
-            handle.move_to_line()
+    def translate(self, translation):
+        p1, p2 = [translate_pixel_point(p, translation) for p in [self.p1(), self.p2()]]
+        self.setLine(QLineF(p1, p2))
 
-    def set_visible_handles(self, is_visible, non_check_handle=None):
+    def end_resizing(self):
         """
-        Turn on of off all handles
-        :param is_visible:
-        :param non_check_handle: do not apply to this handle, useful to let this one visible when it's active
+        All housekeeping after resizing is finished
         :return:
         """
+        self.remove_handles()
+
+    # handles
+    def set_handles(self):
+        self.handles = self.get_handles()
+
+    def remove_handles(self, non_check_handle=None):
         for handle in self.handles:
             if handle == non_check_handle:
                 continue
-            handle.setVisible(is_visible)
+            handle.setParentItem(None)
+            self.handles.remove(handle)
+            self.scene().removeItem(handle)
+            del handle
+
+    def get_handles(self):
+        handle_start      = EnlargeHandle(self, True, self.scale_factor)     # enlarge start point
+        handle_end        = EnlargeHandle(self, False, self.scale_factor)    # enlarge end point
+        handle_start_move = RotateHandle(self, True, self.scale_factor)      # rotate around end point
+        handle_end_move   = RotateHandle(self, False, self.scale_factor)     # rotate around start point
+        handle_move       = MoveHandle(self)
+        handles = [handle_start, handle_end, handle_start_move, handle_end_move, handle_move]
+        return handles
 
     # events
     def mousePressEvent(self, event):
         """
-        Allow all handles
+        Make all handles visible, so the user can start manipulating the item
         :param event:
         :return:
         """
-        self.set_visible_handles(True)
+        # print('click on %s' % self.name)
+        self.set_handles()
         super().mousePressEvent(event)
+
+    def hoverEnterEvent(self, event):
+        # print('mouse on %s' % self.name)
+        super().hoverEnterEvent(event)
 
     def __str__(self):
         return 'line %s,%s' % (self.start_point(), self.end_point())
 
 
-class EnlargeHandle(QGraphicsPolygonItem):
+class Handle(QGraphicsItemGroup):
+    """
+    Base class for Handle associated to a parent item. Useful to enlarge, rotate, etc., the parent item
+    """
+    def __init__(self, parent_item):
+        self.parent_item = parent_item
+
+        super().__init__()
+        self.setFlag(QGraphicsItem.ItemIsMovable)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)  # to send itemChange
+        self.setParentItem(self.parent_item)
+
+        self.move_to_parent()
+
+    def move_to_parent(self):
+        """
+        Position the handle in the scene (depending on where the parent is)
+        :return:
+        """
+        pass
+
+    def update_parent(self, new_position):
+        """
+        Updates the parent position according to the handle new position
+        :param new_position:
+        :return:
+        """
+        pass
+
+    def itemChange(self, change, value):
+        """
+        Update parent when the handle is moving
+        :param change:
+        :param value:
+        :return:
+        """
+        if change == QGraphicsItem.ItemPositionChange:
+            self.parent_item.remove_handles(non_check_handle=self)
+            self.update_parent(value)
+        return super().itemChange(change, value)
+
+    def mouseReleaseEvent(self, event):
+        """
+        Finish the transformation
+        :param event:
+        :return:
+        """
+        self.parent_item.end_resizing()
+        super().mouseReleaseEvent(event)
+
+
+class EnlargeHandle(Handle):
     """
     Handle to enlarge one end of a line
     """
@@ -245,106 +316,107 @@ class EnlargeHandle(QGraphicsPolygonItem):
         self.size         = size
         self.t            = t
         self.is_start     = is_start
-        self.parent_line  = parent_line
-        self.scale_factor = scale_factor
+        self.polygon      = QGraphicsPolygonItem()   # property initialed with move_to_parent
+        self.polygon.setBrush(QColor(color[0], color[1], color[2]))
 
-        super().__init__()
-        self.setBrush(QColor(color[0], color[1], color[2]))
-        self.setFlag(QGraphicsItem.ItemIsMovable)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)  # to send itemChange
-        self.setParentItem(parent_line)
+        super().__init__(parent_line)
+        self.addToGroup(self.polygon)
 
-        self.move_to_line()
-
-        self.setVisible(False)
-
-    def move_to_line(self):
-        pp1, pp2 = self.ordered_end_points()
-        polygon  = get_arrow_head(pp1, pp2, self.size, percentage=self.t)
-        self.setPolygon(polygon)
-
-    def selected_end_point(self):
-        return self.parent_line.p1() if self.is_start else self.parent_line.p2()
-
-    def ordered_end_points(self):
-        return [self.parent_line.p2(), self.parent_line.p1()] if self.is_start else \
-            [self.parent_line.p1(), self.parent_line.p2()]
-
-    def itemChange(self, change, value):
+    def move_to_parent(self):
         """
-        Update line when the handle is moving
-        :param change:
-        :param value:
+        Position the handle in the scene (depending on where the parent is)
         :return:
         """
-        if change == QGraphicsItem.ItemPositionChange:
-            self.parent_line.set_visible_handles(False, non_check_handle=self)
-            vertex_value = self.polygon().last() + value
-            value_in_line = project_pixel_point_to_segment(self.parent_line.p1(), self.parent_line.p2(),
-                                                           vertex_value, in_segment=False)
-            self.parent_line.update_line_end_point(self.is_start, value_in_line)
-        return super().itemChange(change, value)
+        pp1, pp2 = self.ordered_end_points()
+        polygon  = get_arrow_head(pp1, pp2, self.size, percentage=self.t)
+        self.polygon = QGraphicsPolygonItem(polygon)
 
-    def mouseReleaseEvent(self, event):
-        self.parent_line.set_visible_handles(False)
-        self.parent_line.stick_to_line_handles()
-        super().mouseReleaseEvent(event)
+    def update_parent(self, new_position):
+        """
+        Updates the parent position according to the handle new position
+        :param new_position:
+        :return:
+        """
+        vertex_value = self.polygon.polygon().last() + new_position
+        value_in_line = project_pixel_point_to_segment(self.parent_item.p1(), self.parent_item.p2(),
+                                                       vertex_value, in_segment=False)
+        self.parent_item.update_line_end_point(self.is_start, value_in_line)
+
+    def ordered_end_points(self):
+        return [self.parent_item.p2(), self.parent_item.p1()] if self.is_start else \
+            [self.parent_item.p1(), self.parent_item.p2()]
 
 
-class RotateHandle(QGraphicsEllipseItem):
+class MoveHandle(Handle):
+    """
+    Handle to move an item
+    """
+    def __init__(self, parent_item, size=10, color=(255, 255, 255)):
+        self.size      = size
+        self.rectangle = QGraphicsRectItem()  # property initialed with move_to_parent
+        self.rectangle.setBrush(QColor(color[0], color[1], color[2]))
+
+        super().__init__(parent_item)
+        self.addToGroup(self.rectangle)
+
+    def move_to_parent(self):
+        """
+        Position the handle in the scene (depending on where the parent is)
+        :return:
+        """
+        pos            = self.parent_item.central_point()
+        rectangle      = QRectF(pos.x()-self.size/2, pos.y()-self.size/2, self.size, self.size)
+        self.rectangle = QGraphicsRectItem(rectangle)
+
+    def update_parent(self, new_position):
+        """
+        Updates the parent position according to the handle new position
+        :param new_position:
+        :return:
+        """
+        self.parent_item.translate(difference_pixel_point(new_position, self.pos()))
+
+
+class RotateHandle(Handle):
     """
     Handle to rotate a line around one of its end points
     """
     def __init__(self, parent_line, is_start, scale_factor, percentage=0.8, size=(-5, -5, 10, 10),
                  color=(255, 255, 255)):
-        super().__init__(size[0], size[1], size[2], size[3])
         self.is_start     = is_start
-        self.parent_line  = parent_line
         self.scale_factor = scale_factor
         self.percentage   = percentage
 
-        self.setBrush(QColor(color[0], color[1], color[2]))
-        self.setFlag(QGraphicsItem.ItemIsMovable)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)  # to send itemChange events
-        self.setParentItem(parent_line)
+        self.circle = QGraphicsEllipseItem(size[0], size[1], size[2], size[3])  # property initialed with move_to_parent
+        self.circle.setBrush(QColor(color[0], color[1], color[2]))
 
-        self.move_to_line()
+        super().__init__(parent_line)
+        self.addToGroup(self.circle)
 
-        self.setVisible(False)  # handles only appears when parent object is selected
-
-    def move_to_line(self):
+    def move_to_parent(self):
         pp1, pp2 = self.ordered_end_points()
         pp3      = get_point_at_t_pixels(pp1, pp2, t=self.percentage)
-        self.setPos(pp3)
+        self.circle.setPos(pp3)
 
-    def ordered_end_points(self):
-        return [self.parent_line.p2(), self.parent_line.p1()] if self.is_start else \
-            [self.parent_line.p1(), self.parent_line.p2()]
-
-    def non_selected_end_point(self):
-        return self.parent_line.p2() if self.is_start else self.parent_line.p1()
-
-    def itemChange(self, change, value):
+    def update_parent(self, new_position):
         """
-        Update line when the circle is moving
-        :param change:
-        :param value:
+        Updates the parent position according to the handle new position
+        :param new_position:
         :return:
         """
-        if change == QGraphicsItem.ItemPositionChange:
-            self.parent_line.set_visible_handles(False, non_check_handle=self)
-            length = self.parent_line.length_in_pixels()
-            pp1    = self.non_selected_end_point()
-            p1, p2 = pixel_points_to_point([pp1, value])
-            p3     = point_between_points_at_distance(p1, p2, length)
-            pp3    = point_to_pixel_point(p3, 1.0)
-            self.parent_line.update_line_end_point(self.is_start, pp3)
-        return super().itemChange(change, value)
+        length = self.parent_item.length_in_pixels()
+        pp1    = self.non_selected_end_point()
+        p1, p2 = pixel_points_to_point([pp1, new_position])
+        p3     = point_between_points_at_distance(p1, p2, length)
+        pp3    = point_to_pixel_point(p3, 1.0)
+        self.parent_item.update_line_end_point(self.is_start, pp3)
 
-    def mouseReleaseEvent(self, event):
-        self.parent_line.set_visible_handles(False)
-        self.parent_line.stick_to_line_handles()
-        super().mouseReleaseEvent(event)
+    def ordered_end_points(self):
+        return [self.parent_item.p2(), self.parent_item.p1()] if self.is_start else \
+            [self.parent_item.p1(), self.parent_item.p2()]
+
+    def non_selected_end_point(self):
+        return self.parent_item.p2() if self.is_start else self.parent_item.p1()
 
 
 # auxiliary functions
@@ -396,7 +468,7 @@ def pixel_point_to_point(q_point, scale_factor, translate):
 
 def pixel_points_to_point(pixel_points, scale_factor=1.0, translate=None):
     """
-    Convinient form to get point from pixel points at once
+    Convenient form to get point from pixel points at once
     :param pixel_points:
     :param scale_factor:
     :param translate:
@@ -408,6 +480,18 @@ def pixel_points_to_point(pixel_points, scale_factor=1.0, translate=None):
 
 def distance_in_pixels(p1, p2):
     return math.hypot(p1.x()-p2.x(), p1.y()-p2.y())
+
+
+def middle_pixel_point(p1, p2):
+    return QPointF((p1.x()+p2.x())/2, (p1.y()+p2.y())/2)
+
+
+def difference_pixel_point(p1, p2):
+    return QPointF(p1.x()-p2.x(), p1.y()-p2.y())
+
+
+def translate_pixel_point(p, translation):
+    return QPointF(p.x()+translation.x(), p.y()+translation.y())
 
 
 def project_pixel_point_to_segment(pp1, pp2, pp3, in_segment=False):
