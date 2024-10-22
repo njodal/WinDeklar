@@ -61,11 +61,15 @@ class ExampleHost(WinForm.HostModel):
         """
         if figure.name == self.graph1_key:
             if self.figure is None:
-                self.figure = figure
-                items = [es.SceneLine([0.0, 0.0], [1.0, 2.0], name='first'), es.SceneLine([1.0, 1.0], [2.0, 2.0]),
-                         es.SceneLine([-1.0, 0.0], [1.0, 0.0]), es.SceneLine([0.0, -1.0], [0.0, 1.0])]
+                # just load items the first time the figure appears
+                self.figure = figure  # assure not call again initialization
+                items = [es.SceneLine([0.0, 0.0], [1.0, 2.0], {'name': 'first'}),
+                         es.SceneLine([1.0, 1.0], [2.0, 2.0], {}),
+                         es.SceneLine([-1.0, 0.0], [1.0, 0.0], {}),
+                         es.SceneLine([0.0, -1.0], [0.0, 1.0], {}),
+                         es.SceneCorridor([-2, -1], [2, -1], 10, {'name': 'corridor one'})]
                 for item in items:
-                    figure.add_item(item)
+                    self.figure.add_item(item)
 
     def redraw(self):
         """
