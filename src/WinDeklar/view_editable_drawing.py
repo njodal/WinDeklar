@@ -63,13 +63,10 @@ class ExampleHost(WinForm.HostModel):
             if self.figure is None:
                 # just load items the first time the figure appears
                 self.figure = figure  # assure not call again initialization
-                items = [es.SceneLine([0.0, 0.0], [1.0, 2.0], {'name': 'first'}),
-                         es.SceneLine([1.0, 1.0], [2.0, 2.0], {}),
-                         es.SceneLine([-1.0, 0.0], [1.0, 0.0], {}),
-                         es.SceneLine([0.0, -1.0], [0.0, 1.0], {}),
+                items = [es.SceneLine([0.0, 0.0], [1.0, 2.0], {'name': 'first line'}),
+                         es.SceneCircle([-1.0, 1.0], 1.0, {'name': 'first circle'}),
                          es.SceneCorridor([-2, -1], [2, -1], 10, {'name': 'corridor one'})]
-                for item in items:
-                    self.figure.add_item(item)
+                self.figure.add_items(items)
 
     def redraw(self):
         """
