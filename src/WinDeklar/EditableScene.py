@@ -1,8 +1,10 @@
 import math
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, \
-    QGraphicsItem, QGraphicsLineItem, QGraphicsPolygonItem, QGraphicsItemGroup, QGraphicsRectItem
+import functools
+
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, QMenu, QAction, QShortcut,\
+    QGraphicsItem, QGraphicsLineItem, QGraphicsPolygonItem, QGraphicsItemGroup, QGraphicsRectItem, QUndoCommand
 from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF
-from PyQt5.QtGui import QPen, QColor, QPolygonF
+from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence
 
 
 class EditableFigure(QGraphicsView):
@@ -21,12 +23,20 @@ class EditableFigure(QGraphicsView):
         self.parent = parent
         self.scene  = QGraphicsScene(self)
         self.setScene(self.scene)
+
+        # undo functionality
         self.undo_stack = QUndoStack()
+        undo_shortcut = QShortcut(QKeySequence("Ctrl+Z"), self)
+        undo_shortcut.activated.connect(self.undo)
+
+        redo_shortcut = QShortcut(QKeySequence("Ctrl+Y"), self)
+        redo_shortcut.activated.connect(self.redo)
+
         if multiple_selection:
             self.setDragMode(QGraphicsView.RubberBandDrag)
 
         self.scale_factor = scale_factor
-        self.scale(1, -1)  # to point y-axis forward, not backward
+        self.scale(1, -1)  # to point y-axis up, not down
 
         # zoom parameters
         self.zoom_factor  = 1.15
@@ -34,20 +44,83 @@ class EditableFigure(QGraphicsView):
         self.max_zoom     = 10.0
         self.current_zoom = 1.0
 
-    def add_item(self, item):
+    def get_items(self):
+        return [item.serialize() for item in self.items() if isinstance(item, SceneItem)]
+
+    def get_item_in_position(self, pos_in_view):
+        pos_in_scene = self.mapToScene(pos_in_view)
+        for item1 in self.scene.items():
+            item = item1.group()
+            if item is None:
+                continue
+            if item.contains(pos_in_scene):
+                return item
+        return None
+
+    def add_item(self, item_def, item_key='item'):
+        if item_key not in item_def:
+            msg = 'Invalid items definition format, %s not present in %s' % (item_key, item_def)
+            return msg
+
+        item, msg = get_item(item_def[item_key], self)
+        if item is None:
+            return msg
         self.scene.addItem(item)
-        item.set_view(self)
+        return ''
 
-    def add_items(self, items):
-        for item in items:
-            self.add_item(item)
+    def add_items(self, items_def, points_box=None, group_key='items', item_key='item'):
+        """
+        Adds a set of items to a scene
+        :param items_def:
+        :param points_box: bounding box of all items :type PointsBox
+        :param group_key:
+        :param item_key:
+        :return:
+        """
+        if group_key not in items_def:
+            msg = 'Invalid items definition format, group %s not present in %s' % (group_key, items_def)
+            return [msg]
 
-    def delete_item(self, item):
+        if points_box is not None:
+            self.scene.setSceneRect(rect_from_points_box(points_box))
+
+        fails_msg = []
+        for item_def in items_def[group_key]:
+            fail_msg = self.add_item(item_def, item_key=item_key)
+            if fail_msg != '':
+                fails_msg.append(fail_msg)
+        return fails_msg
+
+    def add_item_from_ui(self, item_type, position):
+        """
+        Add an item from in a given position
+        :param item_type:
+        :param position:
+        :return:
+        """
+        item_def = get_default_item(item_type, position)
+        item, msg = get_item(item_def['item'], self)
+        self.undo_stack.push(AddItemCommand(self, item))
+
+    def delete_item_from_ui(self, item_in_position):
+        """
+        Delete the item in a given position
+        :param item_in_position:
+        :return:
+        """
+        print('  delete %s' % item_in_position)
+        if item_in_position is None:
+            return
+        if isinstance(item_in_position, SceneItem):
+            item_in_position.remove_handles()
+        self.undo_stack.push(RemoveItemCommand(self, item_in_position))
+
+    def remove_item(self, item):
         self.scene.removeItem(item)
 
     def delete_selected_items(self):
         for item in self.scene.selectedItems():
-            self.delete_item(item)
+            self.remove_item(item)
 
     def clear(self):
         self.scene.clear()
@@ -64,10 +137,23 @@ class EditableFigure(QGraphicsView):
         for item in self.view.scene.selectedItems():
             yield item
 
+    def event_pos_to_pixel_point(self, event_pos):
+        translate = QPointF(0, 0)
+        return pixel_point_to_point(self.mapToScene(event_pos), self.scale_factor, translate)
+
+    # undo
+    def undo(self):
+        self.undo_stack.undo()
+
+    def redo(self):
+        self.undo_stack.redo()
+
     # events
     def mousePressEvent(self, event):
-        if event.button() == Qt.RightButton:
-            print("Right click")
+        if event.button() == Qt.LeftButton:
+            selected_item = self.get_item_in_position(event.pos())
+            if isinstance(selected_item, SceneItem):
+                selected_item.set_handles()
         super().mousePressEvent(event)
 
     def wheelEvent(self, event):
@@ -82,6 +168,29 @@ class EditableFigure(QGraphicsView):
         else:
             # Zoom out
             self.zoom_out()
+
+    def contextMenuEvent(self, event):
+        """
+        Display a context menu
+        :param event:
+        :return:
+        """
+        context_menu = QMenu()
+
+        for [item_type, item_desc] in [['line', 'Add line'], ['circle', 'Add circle']]:
+            action1 = QAction(item_desc, self)
+            context_menu.addAction(action1)
+            action1.triggered.connect(functools.partial(self.add_item_from_ui, item_type,
+                                                        self.event_pos_to_pixel_point(event.pos())))
+
+        item_in_position = self.get_item_in_position(event.pos())
+        if item_in_position is not None:
+            context_menu.addSeparator()
+            action_del = QAction('Delete %s' % item_in_position.type_and_name(), self)
+            context_menu.addAction(action_del)
+            action_del.triggered.connect(functools.partial(self.delete_item_from_ui, item_in_position))
+
+        context_menu.exec_(event.globalPos())
 
     def zoom_in(self):
         if self.current_zoom * self.zoom_factor < self.max_zoom:
@@ -98,39 +207,35 @@ class EditableFigure(QGraphicsView):
         Initialize the scene with items from provider
         :return:
         """
-        # print('update figure')
         self.items().clear()
         self.parent.provider.update_view(self, None)  # calls provider to get the initial items
-        # self.parent.provider.apply_zoom()
-        # self.draw()
 
 
-class SceneItems(object):
-    """
-    Keeps the items present in a scene
-    """
+# undo commands
+class AddItemCommand(QUndoCommand):
+    def __init__(self, view, item, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.view = view
+        self.item = item
 
-    def __init__(self):
-        self.index = 0
-        self.items = []
+    def redo(self):
+        self.view.scene.addItem(self.item)
 
-    def add_item(self, item):
-        self.items.append(item)
+    def undo(self):
+        self.view.scene.removeItem(self.item)
 
-    def delete_item(self, item):
-        self.items.remove(item)
 
-    def __iter__(self):
-        self.index = 0
-        return self
+class RemoveItemCommand(QUndoCommand):
+    def __init__(self, view, item, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.view = view
+        self.item = item
 
-    def __next__(self):
-        if self.index < len(self.items):
-            item = self.items[self.index]
-            self.index += 1
-            return item
-        else:
-            raise StopIteration
+    def redo(self):
+        self.view.scene.removeItem(self.item)
+
+    def undo(self):
+        self.view.scene.addItem(self.item)
 
 
 class SceneItem(QGraphicsItemGroup):
@@ -140,17 +245,23 @@ class SceneItem(QGraphicsItemGroup):
     """
     is_movable_key    = 'is_movable'
     is_selectable_key = 'is_selectable'
+    type_key    = 'type'
+    start_key   = 'start'
+    end_key     = 'end'
+    center_key  = 'center'
+    radius_key  = 'radius'
+    name_key    = 'name'
+    tooltip_key = 'tooltip'
+    width_key   = 'width'
 
-    def __init__(self, item_def, scale_factor=100.0):
+    def __init__(self, item_def, view):
         """
         Super class to define an item that can be
         :param item_def:  item definition :type dict
-        :param scale_factor: factor to convert from real values (usually meters) to pixels (number of pixels per meter)
+        :param view: view that host the item
         """
-        # to avoid warning
-        self.view = None
-
-        self.scale_factor = scale_factor
+        self.view = view
+        self.scale_factor = self.view.scale_factor  # keep the scale factor used in creation time
         super().__init__()
         if item_def.get(self.is_movable_key, False):
             self.setFlag(QGraphicsItem.ItemIsMovable)
@@ -159,6 +270,7 @@ class SceneItem(QGraphicsItemGroup):
 
         self.item_def = item_def
         self.name     = item_def.get('name', '')
+        self.type     = item_def.get('type', '')
         tooltip       = self.item_def.get('tooltip', self.name)
         if tooltip != '':
             self.setToolTip(tooltip)
@@ -169,9 +281,6 @@ class SceneItem(QGraphicsItemGroup):
         # self.setFlag(QGraphicsItem.ItemIsSelectable)
 
         self.handles = []  # handles are created only when the item is clicked
-
-    def set_view(self, view):
-        self.view = view
 
     def end_resizing(self):
         """
@@ -193,34 +302,45 @@ class SceneItem(QGraphicsItemGroup):
         return []
 
     # events
-    def mousePressEvent(self, event):
-        """
-        Make all handles visible, so the user can start manipulating the item
-        :param event:
-        :return:
-        """
-        # print('click on %s' % self.name)
-        self.set_handles()
-        super().mousePressEvent(event)
-
     def hoverEnterEvent(self, event):
         # print('mouse on %s' % self.name)
         super().hoverEnterEvent(event)
 
+    # serialization
+    def serialize(self):
+        self.update_def()
+        return self.item_def
+
+    def update_def(self):
+        """
+        Update item definition with
+        :return:
+        """
+        pass
+
+    def type_and_name(self):
+        return '%s %s' % (self.type, self.name)
+
 
 class SceneLine(SceneItem):
-    def __init__(self, start_point, end_point, item_def, scale_factor=100.0):
+    def __init__(self, item_def, view):
         """
         Define a line
-        :param start_point: in meters
-        :param end_point:   in meters
-        :param scale_factor: scale factor to convert to pixels
         """
-        super().__init__(item_def, scale_factor=scale_factor)
+        super().__init__(item_def, view)
+        start_point        = item_def[SceneItem.start_key]
+        end_point          = item_def[SceneItem.end_key]
         start_point_pixels = point_to_pixel_point(start_point, self.scale_factor)
         end_point_pixels   = point_to_pixel_point(end_point, self.scale_factor)
         self.line          = QGraphicsLineItem(QLineF(start_point_pixels, end_point_pixels))
         self.addToGroup(self.line)
+
+    def contains(self, point: QPointF):
+        d = distance_to_segment(self.p1(), self.p2(), point)
+        return d < self.contain_width()
+
+    def contain_width(self):
+        return 10
 
     def p1(self):
         return self.line.line().p1()
@@ -228,7 +348,7 @@ class SceneLine(SceneItem):
     def p2(self):
         return self.line.line().p2()
 
-    def central_point(self):
+    def center_pixel_point(self):
         return middle_pixel_point(self.p1(), self.p2())
 
     def start_point(self):
@@ -269,115 +389,45 @@ class SceneLine(SceneItem):
         handles = [handle_start, handle_end, handle_start_move, handle_end_move, handle_move]
         return handles
 
+    def update_def(self):
+        """
+        Update item definition with
+        :return:
+        """
+        self.item_def[self.start_key] = self.start_point()
+        self.item_def[self.end_key]   = self.end_point()
+
     def __str__(self):
         return 'line %s,%s' % (self.start_point(), self.end_point())
 
 
-class SceneCircle(SceneItem):
-    def __init__(self, center_point, radius, item_def, scale_factor=100.0):
-        """
-        Define a circle
-        :param center_point: in meters
-        :param radius:   in meters
-        :param scale_factor: scale factor to convert to pixels
-        """
-        super().__init__(item_def, scale_factor=scale_factor)
-        center_pixels = point_to_pixel_point(center_point, self.scale_factor)
-        radius_pixels = scale(radius, self.scale_factor)
-        self.circle   = get_circle(center_pixels, radius_pixels)
-        self.addToGroup(self.circle)
-
-    def central_point(self):
-        bounding_rect = self.circle.rect()
-        return bounding_rect.center()
-
-    def radius_pixels(self):
-        bounding_rect = self.circle.rect()
-        return bounding_rect.width() / 2
-
-    def center(self):
-        return pixel_point_to_point(self.central_point(), self.scale_factor, self.pos())
-
-    def radius(self):
-        return de_scale(self.radius_pixels(), self.scale_factor)
-
-    # update
-    def translate(self, translation):
-        bounding_rect = self.circle.rect()
-        self.circle.setRect(bounding_rect.x() + translation.x(), bounding_rect.y() + translation.y(),
-                            bounding_rect.width(), bounding_rect.height())
-
-    def update_radius(self, new_position):
-        center     = self.central_point()
-        new_radius = distance_in_pixels(center, new_position)
-        # print(center, new_position, new_radius)
-        self.circle.setRect(center.x() - new_radius, center.y() - new_radius, new_radius*2, new_radius*2)
-
-    # handles
-    def get_handles(self):
-        handle_enlarge = ChangeSizeHandle(self)
-        handle_move    = MoveHandle(self)              # move the whole item
-        handles = [handle_enlarge, handle_move]
-        return handles
-
-    def __str__(self):
-        return 'circle %s,%s' % (self.center(), self.radius())
-
-
-class SceneCorridor(SceneItem):
+class SceneCorridor(SceneLine):
     """
-    A movable, resizable line
+    A movable, resizable corridor (a center line with two borders)
     """
-    def __init__(self, start_point, end_point, width, item_def, scale_factor=100.0):
+    def __init__(self, item_def, view):
         """
-        Define a line
-        :param start_point: in meters
-        :param end_point:   in meters
-        :param scale_factor: scale factor to convert to pixels
+        Define a line (a center line with a width)
         """
-        super().__init__(item_def, scale_factor=scale_factor)
-
-        self.width         = width
-        start_point_pixels = point_to_pixel_point(start_point, self.scale_factor)
-        end_point_pixels   = point_to_pixel_point(end_point, self.scale_factor)
-        self.center_line   = QGraphicsLineItem(QLineF(start_point_pixels, end_point_pixels))
-        pen                = QPen()
+        super().__init__(item_def, view)
+        self.width = scale(item_def.get(self.width_key, 1.0), self.scale_factor)
+        pen        = QPen()
         pen.setStyle(Qt.DashLine)
-        self.center_line.setPen(pen)
+        self.line.setPen(pen)
         self.border1 = QGraphicsLineItem()
         self.border2 = QGraphicsLineItem()
 
         self.update_borders()
-        self.addToGroup(self.center_line)
         self.addToGroup(self.border1)
         self.addToGroup(self.border2)
 
-    def p1(self):
-        return self.center_line.line().p1()
-
-    def p2(self):
-        return self.center_line.line().p2()
-
-    def central_point(self):
-        return middle_pixel_point(self.p1(), self.p2())
-
-    def start_point(self):
-        return pixel_point_to_point(self.p1(), self.scale_factor, self.pos())
-
-    def end_point(self):
-        return pixel_point_to_point(self.p2(), self.scale_factor, self.pos())
-
-    def length_in_pixels(self):
-        """
-        Returns the line length in pixels
-        :return:
-        """
-        return distance_in_pixels(self.p1(), self.p2())
+    def contain_width(self):
+        return self.width
 
     def get_borders_lines(self):
         p1, p2  = pixel_points_to_point([self.p1(), self.p2()])
         borders = parallel_segments(p1, p2, self.width/2)
-        lines = [QLineF(point_to_pixel_point(start, 1.0), point_to_pixel_point(end, 1.0)) for [start, end] in borders]
+        lines   = [QLineF(point_to_pixel_point(start, 1.0), point_to_pixel_point(end, 1.0)) for [start, end] in borders]
         return lines
 
     # update
@@ -388,13 +438,11 @@ class SceneCorridor(SceneItem):
         :param new_pos:
         :return:
         """
-        p1, p2 = [new_pos, self.p2()] if is_start else [self.p1(), new_pos]
-        self.center_line.setLine(QLineF(p1, p2))
+        super().update_line_end_point(is_start, new_pos)
         self.update_borders()
 
     def translate(self, translation):
-        p1, p2 = [translate_pixel_point(p, translation) for p in [self.p1(), self.p2()]]
-        self.center_line.setLine(QLineF(p1, p2))
+        super().translate(translation)
         self.update_borders()
 
     def update_borders(self):
@@ -406,18 +454,75 @@ class SceneCorridor(SceneItem):
         self.border1.setLine(lines[0])
         self.border2.setLine(lines[1])
 
+    def __str__(self):
+        return 'corridor %s,%s' % (self.start_point(), self.end_point())
+
+
+class SceneCircle(SceneItem):
+    def __init__(self, item_def, view):
+        """
+        Define a circle from a center point and radius
+        """
+        super().__init__(item_def, view)
+        center_point  = item_def[SceneItem.center_key]
+        radius        = item_def[SceneItem.radius_key]
+        center_pixels = point_to_pixel_point(center_point, self.scale_factor)
+        radius_pixels = scale(radius, self.scale_factor)
+        self.circle   = get_circle(center_pixels, radius_pixels)
+        self.addToGroup(self.circle)
+
+    def center_pixel_point(self):
+        """
+        Returns the circle's center in pixels
+        :return:
+        """
+        bounding_rect = self.circle.rect()
+        return bounding_rect.center()
+
+    def radius_pixels(self):
+        bounding_rect = self.circle.rect()
+        return bounding_rect.width() / 2
+
+    def center(self):
+        """
+        Returns the circle's center in meters
+        :return:
+        """
+        return pixel_point_to_point(self.center_pixel_point(), self.scale_factor, self.pos())
+
+    def radius(self):
+        print(self.radius_pixels(), de_scale(self.radius_pixels(), self.scale_factor))
+        return de_scale(self.radius_pixels(), self.scale_factor)
+
+    # update
+    def translate(self, translation):
+        bounding_rect = self.circle.rect()
+        self.circle.setRect(bounding_rect.x() + translation.x(), bounding_rect.y() + translation.y(),
+                            bounding_rect.width(), bounding_rect.height())
+
+    def update_radius(self, new_position):
+        center     = self.center_pixel_point()
+        new_radius = distance_in_pixels(center, new_position)
+        # print(center, new_position, new_radius)
+        self.circle.setRect(center.x() - new_radius, center.y() - new_radius, new_radius*2, new_radius*2)
+
     # handles
     def get_handles(self):
-        handle_start      = ChangeEndPointHandle(self, True)     # enlarge start point
-        handle_end        = ChangeEndPointHandle(self, False)    # enlarge end point
-        handle_start_move = RotateHandle(self, True)      # rotate around end point
-        handle_end_move   = RotateHandle(self, False)     # rotate around start point
-        handle_move       = MoveHandle(self)              # move the whole item
-        handles = [handle_start, handle_end, handle_start_move, handle_end_move, handle_move]
+        handle_enlarge = ChangeSizeHandle(self)
+        handle_move    = MoveHandle(self)              # move the whole item
+        handles = [handle_enlarge, handle_move]
         return handles
 
+    def update_def(self):
+        """
+        Update item definition with
+        :return:
+        """
+        self.item_def[self.center_key] = self.center()
+        self.item_def[self.radius_key] = self.radius()
+
     def __str__(self):
-        return 'line %s,%s' % (self.start_point(), self.end_point())
+        return 'circle %s,%s' % (self.center(), self.radius())
 
 
 class Handle(QGraphicsItemGroup):
@@ -476,9 +581,9 @@ class ChangeEndPointHandle(Handle):
     """
     Handle to change one of the end points of a line
     """
-    def __init__(self, parent_line, is_start, size=10, t=0.9, color=(255, 255, 255)):
+    def __init__(self, parent_line, is_start, size=10, arrow_angle_degrees=30, color=(255, 255, 255)):
         self.size         = size
-        self.t            = t
+        self.arrow_angle  = arrow_angle_degrees
         self.is_start     = is_start
         self.polygon      = QGraphicsPolygonItem()   # property initialed with move_to_parent
         self.polygon.setBrush(QColor(color[0], color[1], color[2]))
@@ -491,8 +596,8 @@ class ChangeEndPointHandle(Handle):
         Position the handle in the scene (depending on where the parent is)
         :return:
         """
-        pp1, pp2 = self.ordered_end_points()
-        polygon  = get_arrow_head(pp1, pp2, self.size, percentage=self.t)
+        pp1, pp2     = self.ordered_end_points()
+        polygon      = get_arrow_head(pp1, pp2, self.size, arrow_angle_degrees=self.arrow_angle)
         self.polygon = QGraphicsPolygonItem(polygon)
 
     def update_parent(self, new_position):
@@ -523,7 +628,7 @@ class ChangeSizeHandle(Handle):
 
         super().__init__(parent_item)
         self.addToGroup(self.circle)
-        center = self.parent_item.central_point()
+        center = self.parent_item.center_pixel_point()
         radius = self.parent_item.radius_pixels()
         pp1    = QPointF(center.x() + radius, center.y())
         self.circle.setPos(pp1)
@@ -558,7 +663,7 @@ class MoveHandle(Handle):
         Position the handle in the scene (depending on where the parent is)
         :return:
         """
-        pos            = self.parent_item.central_point()
+        pos            = self.parent_item.center_pixel_point()
         rectangle      = QRectF(pos.x()-self.size/2, pos.y()-self.size/2, self.size, self.size)
         self.rectangle = QGraphicsRectItem(rectangle)
 
@@ -613,6 +718,47 @@ class RotateHandle(Handle):
         return self.parent_item.p2() if self.is_start else self.parent_item.p1()
 
 
+def get_item(item_def, view):
+    if SceneItem.type_key not in item_def:
+        return None, '%s not present in %s, ignored' % (SceneItem.type_key, item_def)
+    item_type = item_def[SceneItem.type_key]
+    fail_msg  = check_must_have_properties(item_type, item_def)
+    if fail_msg != '':
+        return None, fail_msg
+
+    const = items_metadata[item_type].get('const', None)
+    if const is not None:
+        return const(item_def, view), ''
+    else:
+        return None, '%s type is not implemented' % item_type
+
+
+items_metadata = {'line':     {'const': SceneLine, 'props': [SceneItem.start_key, SceneItem.end_key]},
+                  'circle':   {'const': SceneCircle, 'props': [SceneItem.center_key, SceneItem.radius_key]},
+                  'corridor': {'const': SceneCorridor, 'props': [SceneItem.start_key, SceneItem.end_key]}}
+
+
+def get_default_item(item_type, position):
+    if item_type == 'line':
+        length = 1.0
+        start  = [position[0]-length/2, position[1]]
+        end    = [position[0]+length/2, position[1]]
+        return {'item': {'type': item_type, 'start': start, 'end': end}}
+    elif item_type == 'circle':
+        radius = 0.5
+        return {'item': {'type': item_type, 'center': position, 'radius': radius}}
+    else:
+        print('No default creation for %s' % item_type)
+        return {}
+
+
+def check_must_have_properties(item_type, item_def):
+    for key in items_metadata.get(item_type, [])['props']:
+        if key not in item_def:
+            return '%s not present in %s, ignored' % (key, item_def)
+    return ''  # all required properties are presents
+
+
 def get_circle(center_point, radius):
     """
     Returns a circle
@@ -622,27 +768,29 @@ def get_circle(center_point, radius):
     """
     x = center_point.x() - radius
     y = center_point.y() - radius
-    width = radius
-    height = radius
+    width  = radius*2
+    height = width
     return QGraphicsEllipseItem(x, y, width, height)
 
 
 # auxiliary functions
-def get_arrow_head(start_point, end_point, size=10, percentage=0.9):
+def get_arrow_head(start_point: QPointF, end_point: QPointF, size=10, arrow_angle_degrees=45):
     """
     Returns the head of an arrow aligned with line (start_point, end_point) with the point of the arrow is end_point
-    :param start_point:
-    :param end_point:
+    :param arrow_angle_degrees:
+    :param start_point: :type QPointF
+    :param end_point:   :type QPointF
     :param size: size of each side of the arrow
-    :param percentage: percentage of the line the arrow head will occupy
     :return:
     """
-    p1, p2     = pixel_points_to_point([start_point, end_point])
-    p90        = get_point_at_t(p1, p2, percentage)
-    per_points = perpendicular_points_from_segment(p1, p90, size)
+    line_dx     = end_point.x() - start_point.x()
+    line_dy     = end_point.y() - start_point.y()
+    arrow_angle = math.atan2(line_dy, line_dx)
+    angle       = math.radians(arrow_angle_degrees)
+    points      = [QPointF(end_point.x() - size * math.cos(arrow_angle + sign * angle),
+                           end_point.y() - size * math.sin(arrow_angle + sign * angle)) for sign in [1, -1]]
 
-    points = [QPointF(p[0], p[1]) for p in per_points]
-    points.append(end_point)  # order is important, this should be last
+    points.append(end_point)  # order is important, end_point must be last
     return QPolygonF(points)
 
 
@@ -700,6 +848,51 @@ def difference_pixel_point(p1, p2):
 
 def translate_pixel_point(p, translation):
     return QPointF(p.x()+translation.x(), p.y()+translation.y())
+
+
+def rect_from_points_box(points_box):
+    """
+    Returns a QRectF from a points box
+    x, y = upper left corner
+    :param points_box:
+    :return:
+    """
+    min_x, max_x, min_y, max_y = points_box.size()
+    return QRectF(min_x, max_y, max_x - min_x, max_y - min_y)
+
+
+def distance_to_segment(p1: QPointF, p2: QPointF, p3: QPointF):
+    """
+    given a segment defined by p1, p2, returns distance from p3 to segment
+    https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
+    answer 3:
+
+    :param p1: start point in segment
+    :param p2: end point
+    :param p3:
+    :return:
+    """
+    x1, y1 = [p1.x(), p1.y()]
+    x2, y2 = [p2.x(), p2.y()]
+    x3, y3 = [p3.x(), p3.y()]
+
+    px = x2-x1
+    py = y2-y1
+    d2 = float(px*px + py*py)
+
+    if abs(d2) < 0.0001:
+        # p1 and p2 are too close, just return distance from p1 to p3
+        return math.hypot(x1-x3, y1-y3)  # distance_from_points(p1, p3)
+
+    u = ((x3 - x1) * px + (y3 - y1) * py) / d2
+
+    if u < 0.0 or u > 1.0:
+        return 999999.0  # any big
+
+    x = x1 + u * px
+    y = y1 + u * py
+
+    return math.hypot(x-x3, y-y3)
 
 
 def project_pixel_point_to_segment(pp1, pp2, pp3, in_segment=False):

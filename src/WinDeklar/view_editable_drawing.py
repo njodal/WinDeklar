@@ -4,11 +4,10 @@ import sys
 import time
 
 import WindowForm as WinForm
-import WinDeklar.graph_aux as ga
+import points_box as pb
 import WinDeklar.QTAux as QTAux
 import WinDeklar.record as rc
 import WinDeklar.yaml_functions as ya
-import EditableScene as es
 
 
 class ExampleHost(WinForm.HostModel):
@@ -16,7 +15,7 @@ class ExampleHost(WinForm.HostModel):
     Example of editable drawing
     """
 
-    def __init__(self, default_directory='/tmp', file_extension='yaml'):
+    def __init__(self, file_name, default_directory='/tmp', file_extension='yaml'):
         # keys (names used in the yaml definition file)
         self.points_key = 'points'
         self.axis_key   = 'show_axis'
@@ -27,14 +26,14 @@ class ExampleHost(WinForm.HostModel):
         self.graph2_key = 'graph2'
 
         # particular data
-        self.figure = None
+        self.figure    = None
 
         self.action_name        = 'Action'
         self.last_action_number = 0
         self.directory          = default_directory
         self.file_extension     = file_extension
         self.file_filter        = '*.%s' % self.file_extension
-        self.file_name          = None
+        self.file_name          = file_name
 
         initial_values = {}  # used in case some control needs to have an initial value programmatically
         super(ExampleHost, self).__init__(initial_values=initial_values)
@@ -63,10 +62,10 @@ class ExampleHost(WinForm.HostModel):
             if self.figure is None:
                 # just load items the first time the figure appears
                 self.figure = figure  # assure not call again initialization
-                items = [es.SceneLine([0.0, 0.0], [1.0, 2.0], {'name': 'first line'}),
-                         es.SceneCircle([-1.0, 1.0], 1.0, {'name': 'first circle'}),
-                         es.SceneCorridor([-2, -1], [2, -1], 10, {'name': 'corridor one'})]
-                self.figure.add_items(items)
+                if self.file_name is not None:
+                    items_def = ya.get_yaml_file(self.file_name, directory=None)
+                    box_size  = None  # pb.PointsBox(-2, 2, -2, 2)
+                    self.figure.add_items(items_def, points_box=box_size)
 
     def redraw(self):
         """
@@ -124,8 +123,9 @@ class ExampleHost(WinForm.HostModel):
     def delete_selected_items(self):
         if self.figure is None:
             return
-        self.figure.delete_selected_items()
-        print('Delete selected items')
+        print(self.figure.get_items())
+        # self.figure.delete_selected_items()
+        # print('Delete selected items')
 
     def clear(self):
         if self.figure is None:
@@ -141,12 +141,8 @@ class ExampleHost(WinForm.HostModel):
         :return:
         """
         file = ya.get_yaml_file(file_name, must_exist=True, verbose=True)
-        self.set_values(file['state'])
-        print(self._state)
+        self.load_drawing(file)
         self.refresh()
-
-        # just an example of how to use the ProgressBar, no actually needed in this case
-        progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2)
 
         msg = '%s opened' % file_name
         self.show_status_bar_msg(msg)
@@ -160,21 +156,22 @@ class ExampleHost(WinForm.HostModel):
         """
         if self.figure is None:
             return
-        print('items to save')
-        for item in self.figure.items():
-            print('   %s' % item)
 
-        '''
         record = rc.Record(file_name, dir=None, add_time_stamp=False)
         record.write_ln('version: 1')  # just to avoid warnings with editing in pycharm
-        record.write_group('state', self._state, level=0)
-
-        # just an example of how to use the ProgressBar, no actually needed in this case
-        progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2)
-
+        for item_def in self.figure.get_items():
+            record.write_group('item', item_def, level=0, is_array=True)
         msg = '%s saved' % file_name
         self.show_status_bar_msg(msg)
-        '''
+
+    def load_drawing(self, drawing_def, items_key='items'):
+        if items_key not in drawing_def:
+            self.show_status_bar_msg('Invalid format')
+            return
+        self.figure.clear()
+        fail_msgs = self.figure.add_items(drawing_def)
+        for fail_msg in fail_msgs:
+            print(fail_msg)
 
 
 def progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2):
@@ -186,6 +183,8 @@ def progress_bar_example(progress_bar, max_value=100, inc=20, sleep_time=0.2):
 
 if __name__ == '__main__':
     app = QTAux.def_app()
-    provider = ExampleHost()        # class to handle form specific logic
+    drawing_name = WinForm.get_arg_value(1, None)
+
+    provider = ExampleHost(drawing_name)        # class to handle form specific logic
     WinForm.run_winform(__file__, provider)
     sys.exit(app.exec_())
