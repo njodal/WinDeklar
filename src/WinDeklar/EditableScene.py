@@ -100,7 +100,7 @@ class EditableFigure(QGraphicsView):
         """
         item_def = get_default_item(item_type, position)
         item, msg = get_item(item_def['item'], self)
-        self.undo_stack.push(AddItemCommand(self, item))
+        self.add_ui_command(AddItemCommand(self, item))
 
     def delete_item_from_ui(self, item_in_position):
         """
@@ -108,14 +108,13 @@ class EditableFigure(QGraphicsView):
         :param item_in_position:
         :return:
         """
-        print('  delete %s' % item_in_position)
         if item_in_position is None:
             return
-        if isinstance(item_in_position, SceneItem):
-            item_in_position.remove_handles()
-        self.undo_stack.push(RemoveItemCommand(self, item_in_position))
+        self.add_ui_command(RemoveItemCommand(self, item_in_position))
 
     def remove_item(self, item):
+        if isinstance(item, SceneItem):
+            item.remove_handles()
         self.scene.removeItem(item)
 
     def delete_selected_items(self):
@@ -123,7 +122,7 @@ class EditableFigure(QGraphicsView):
             self.remove_item(item)
 
     def clear(self):
-        self.scene.clear()
+        self.add_ui_command(RemoveItemsCommand(self, self.scene.items()))
 
     def remove_handles(self, non_check_handle=None):
         for handle in self.scene.items():
@@ -147,6 +146,14 @@ class EditableFigure(QGraphicsView):
 
     def redo(self):
         self.undo_stack.redo()
+
+    def add_ui_command(self, command):
+        """
+        Adds a UI command (like add o translate) that can be undone it
+        :param command:
+        :return:
+        """
+        self.undo_stack.push(command)
 
     # events
     def mousePressEvent(self, event):
@@ -209,33 +216,6 @@ class EditableFigure(QGraphicsView):
         """
         self.items().clear()
         self.parent.provider.update_view(self, None)  # calls provider to get the initial items
-
-
-# undo commands
-class AddItemCommand(QUndoCommand):
-    def __init__(self, view, item, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.view = view
-        self.item = item
-
-    def redo(self):
-        self.view.scene.addItem(self.item)
-
-    def undo(self):
-        self.view.scene.removeItem(self.item)
-
-
-class RemoveItemCommand(QUndoCommand):
-    def __init__(self, view, item, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.view = view
-        self.item = item
-
-    def redo(self):
-        self.view.scene.removeItem(self.item)
-
-    def undo(self):
-        self.view.scene.addItem(self.item)
 
 
 class SceneItem(QGraphicsItemGroup):
@@ -365,19 +345,28 @@ class SceneLine(SceneItem):
         return distance_in_pixels(self.p1(), self.p2())
 
     # update
-    def update_line_end_point(self, is_start, new_pos):
+    def update_line_end_point(self, is_start, new_end_point_pos):
         """
         Update one of the line end points depending on the is_start flag
         :param is_start: if True update start end point, else the other one
-        :param new_pos:
+        :param new_end_point_pos:
         :return:
         """
-        p1, p2 = [new_pos, self.p2()] if is_start else [self.p1(), new_pos]
+        p1, p2 = [new_end_point_pos, self.p2()] if is_start else [self.p1(), new_end_point_pos]
         self.line.setLine(QLineF(p1, p2))
+        self.update_others()
 
     def translate(self, translation):
         p1, p2 = [translate_pixel_point(p, translation) for p in [self.p1(), self.p2()]]
         self.line.setLine(QLineF(p1, p2))
+        self.update_others()
+
+    def update_others(self):
+        """
+        Updates other item depending on the main line (to be implemented in subtypes like corridor)
+        :return:
+        """
+        pass
 
     # handles
     def get_handles(self):
@@ -431,18 +420,7 @@ class SceneCorridor(SceneLine):
         return lines
 
     # update
-    def update_line_end_point(self, is_start, new_pos):
-        """
-        Update one of the line end points depending on the is_start flag
-        :param is_start: if True update start end point, else the other one
-        :param new_pos:
-        :return:
-        """
-        super().update_line_end_point(is_start, new_pos)
-        self.update_borders()
-
-    def translate(self, translation):
-        super().translate(translation)
+    def update_others(self):
         self.update_borders()
 
     def update_borders(self):
@@ -491,7 +469,6 @@ class SceneCircle(SceneItem):
         return pixel_point_to_point(self.center_pixel_point(), self.scale_factor, self.pos())
 
     def radius(self):
-        print(self.radius_pixels(), de_scale(self.radius_pixels(), self.scale_factor))
         return de_scale(self.radius_pixels(), self.scale_factor)
 
     # update
@@ -500,10 +477,14 @@ class SceneCircle(SceneItem):
         self.circle.setRect(bounding_rect.x() + translation.x(), bounding_rect.y() + translation.y(),
                             bounding_rect.width(), bounding_rect.height())
 
-    def update_radius(self, new_position):
-        center     = self.center_pixel_point()
-        new_radius = distance_in_pixels(center, new_position)
+    def update_size(self, new_radius):
+        """
+        Changes the circle radius (new radius is from center to new_position)
+        :param new_radius:
+        :return:
+        """
         # print(center, new_position, new_radius)
+        center = self.center_pixel_point()
         self.circle.setRect(center.x() - new_radius, center.y() - new_radius, new_radius*2, new_radius*2)
 
     # handles
@@ -525,6 +506,90 @@ class SceneCircle(SceneItem):
         return 'circle %s,%s' % (self.center(), self.radius())
 
 
+# undo/redo commands
+class AddItemCommand(QUndoCommand):
+    def __init__(self, view, item, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.view = view
+        self.item = item
+
+    def redo(self):
+        self.view.scene.addItem(self.item)
+
+    def undo(self):
+        self.view.scene.removeItem(self.item)
+
+
+class RemoveItemsCommand(QUndoCommand):
+    def __init__(self, view, items, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.view  = view
+        self.items = items
+
+    def redo(self):
+        for item in self.items:
+            self.view.remove_item(item)
+
+    def undo(self):
+        for item in self.items:
+            self.view.scene.addItem(item)
+
+
+class RemoveItemCommand(QUndoCommand):
+    def __init__(self, view, item, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.view = view
+        self.item = item
+
+    def redo(self):
+        self.view.remove_item(self.item)
+
+    def undo(self):
+        self.view.scene.addItem(self.item)
+
+
+class TranslateCommand(QUndoCommand):
+    def __init__(self, item, new_pos, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.item    = item
+        self.new_pos = new_pos
+
+    def redo(self):
+        self.item.translate(self.new_pos)
+
+    def undo(self):
+        self.item.translate(QPointF(-self.new_pos.x(), -self.new_pos.y()))
+
+
+class ChangeEndPointCommand(QUndoCommand):
+    def __init__(self, item, is_start, new_end_point_pos, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.item     = item
+        self.is_start = is_start
+        self.new_pos  = new_end_point_pos
+        self.old_pos  = self.item.p1() if is_start else self.item.p2()
+
+    def redo(self):
+        self.item.update_line_end_point(self.is_start, self.new_pos)
+
+    def undo(self):
+        self.item.update_line_end_point(self.is_start, self.old_pos)
+
+
+class ChangeSizeCommand(QUndoCommand):
+    def __init__(self, item, new_size, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.item     = item
+        self.new_size = new_size
+
+    def redo(self):
+        self.item.update_size(self.new_size)
+
+    def undo(self):
+        self.item.update_size(-self.new_size)
+
+
+# Handles
 class Handle(QGraphicsItemGroup):
     """
     Base class for Handle associated to a parent item. Useful to enlarge, rotate, etc., the parent item
@@ -591,6 +656,10 @@ class ChangeEndPointHandle(Handle):
         super().__init__(parent_line)
         self.addToGroup(self.polygon)
 
+    def ordered_end_points(self):
+        return [self.parent_item.p2(), self.parent_item.p1()] if self.is_start else \
+            [self.parent_item.p1(), self.parent_item.p2()]
+
     def move_to_parent(self):
         """
         Position the handle in the scene (depending on where the parent is)
@@ -606,19 +675,16 @@ class ChangeEndPointHandle(Handle):
         :param new_position:
         :return:
         """
-        vertex_value = self.polygon.polygon().last() + new_position
+        vertex_value  = self.polygon.polygon().last() + new_position
         value_in_line = project_pixel_point_to_segment(self.parent_item.p1(), self.parent_item.p2(),
                                                        vertex_value, in_segment=False)
-        self.parent_item.update_line_end_point(self.is_start, value_in_line)
-
-    def ordered_end_points(self):
-        return [self.parent_item.p2(), self.parent_item.p1()] if self.is_start else \
-            [self.parent_item.p1(), self.parent_item.p2()]
+        command  = ChangeEndPointCommand(self.parent_item, self.is_start, value_in_line)
+        self.parent_item.view.add_ui_command(command)
 
 
 class ChangeSizeHandle(Handle):
     """
-    Handle to rotate a line around one of its end points
+    Handle to change the size (like radius) of an Item
     """
     def __init__(self, parent_item, size=(-5, -5, 10, 10),
                  color=(255, 255, 255)):
@@ -643,7 +709,10 @@ class ChangeSizeHandle(Handle):
         :return:
         """
         self.circle.setPos(self.circle.pos() + new_position)
-        self.parent_item.update_radius(self.circle.pos())
+        center   = self.parent_item.center_pixel_point()
+        new_size = distance_in_pixels(center, self.circle.pos())
+        command  = ChangeSizeCommand(self.parent_item, new_size)
+        self.parent_item.view.add_ui_command(command)
 
 
 class MoveHandle(Handle):
@@ -673,7 +742,8 @@ class MoveHandle(Handle):
         :param new_position:
         :return:
         """
-        self.parent_item.translate(difference_pixel_point(new_position, self.pos()))
+        command = TranslateCommand(self.parent_item, difference_pixel_point(new_position, self.pos()))
+        self.parent_item.view.add_ui_command(command)
 
 
 class RotateHandle(Handle):

@@ -74,17 +74,17 @@ class ExampleHost(WinForm.HostModel):
         """
         self.refresh()
 
-    def initialize(self):
-        """
-        Code to run when initializing the form
-        In this case it is shown how to set visible (or not) a control
-        :return:
-        """
-        # example of how to conditional show a control in the screen
-        control = self.get_widget_by_name('just_text')
-        control.set_visible(False)
-
     # actions
+    def undo(self):
+        if self.figure is None:
+            return
+        self.figure.undo()
+
+    def redo(self):
+        if self.figure is None:
+            return
+        self.figure.redo()
+
     def event_open_file(self):
         """
         Event defined in the yaml file to be called when File/Open is clicked

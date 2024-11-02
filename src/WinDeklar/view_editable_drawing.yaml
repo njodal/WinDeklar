@@ -45,24 +45,13 @@ window:
     - item:
         is_separator: True
     - item:
-        title: '>'
-        tooltip: Advance one step
+        icon:    SP_ArrowBack
+        tooltip: Undo
+        action:  undo
     - item:
-        title: '>>'
-        tooltip: Advance fast
-    - item:
-        title: '>>>'
-        tooltip: Advance faster
-    - item:
-        title: '>|'
-        tooltip: Advance to last step
-        # action: button_next_last
-    - item:
-        name:    action
-        title:   Action
-        type:    Action
-        action:  change_action
-        tooltip: Click to execute an action
+        icon:    SP_ArrowForward
+        tooltip: Redo
+        action:  redo
 
   layout:       # defines the layout of the window
       - item:
@@ -79,54 +68,16 @@ window:
                 widgets:              # an item can have UI widgets inside (like combo, slide, etc)
                   - widget:
                       name:    clear
-                      title:   Clear
+                      title:   Clear all
                       type:    Button
                       action:  clear   # method to call
-                      tooltip: Delete all items
+                      tooltip: Remove all items
                   - widget:
                       name:    delete
                       title:   Delete
                       type:    Button
                       action:  delete_selected_items   # method to call
                       tooltip: Delete selected items
-                  - widget:
-                      name:    graph_type         # internal name, used in the program file
-                      title:   Graph Type         # title to be shown (use '' to not show)
-                      type:    Combo              # this is a ComboBox
-                      values:  [Sine, Cosine, Random, Other]  # valid values
-                      value:   Random                         # initial value
-                      tooltip: Type of graph to show          # message to show when the mouse is over the widget
-                  - widget:
-                      name:    show_axis     # internal name (used in programs), if changed need to change program also
-                      title:   Show Axis     # external name, can be changed without problem
-                      type:    Check         # type of widget: Check, Slider, Button, Combo
-                      value:   True          # initial value
-                      tooltip: Whether show axis values
-                  - widget:
-                      name:    points
-                      title:   Number of points
-                      type:    Slider
-                      parms:   [2, 100, 1]      # [min_value, max_value, scale]
-                      value:   20
-                      tooltip: Length of the X axis
-                  - widget:
-                      name:    line_width
-                      title:   Line Width
-                      type:    EditNumberSpin
-                      parms:   {step: 1.0, maximum: 10}
-                      value:   1.0
-                      tooltip: Width of the graph line
-                  - widget:
-                      name:    just_text
-                      title:   ''  # null to avoid present it on the form
-                      type:    Text
-                      value:   Text
-                  - widget:
-                      name:    redraw
-                      title:   Draw again
-                      type:    Button
-                      action:  redraw   # method to call
-                      tooltip: Press button to draw the graph again
 
             - item:
                 name:    figures
