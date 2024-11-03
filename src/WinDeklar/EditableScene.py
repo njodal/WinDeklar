@@ -1,3 +1,4 @@
+import copy
 import math
 import functools
 
@@ -32,6 +33,15 @@ class EditableFigure(QGraphicsView):
         redo_shortcut = QShortcut(QKeySequence("Ctrl+Y"), self)
         redo_shortcut.activated.connect(self.redo)
 
+        # copy paste
+        self.copy_buffer = None
+        copy_shortcut = QShortcut(QKeySequence("Ctrl+C"), self)
+        copy_shortcut.activated.connect(self.on_copy)
+
+        paste_shortcut = QShortcut(QKeySequence("Ctrl+V"), self)
+        paste_shortcut.activated.connect(self.on_paste)
+
+        # selection
         if multiple_selection:
             self.setDragMode(QGraphicsView.RubberBandDrag)
 
@@ -47,8 +57,11 @@ class EditableFigure(QGraphicsView):
     def get_items(self):
         return [item.serialize() for item in self.items() if isinstance(item, SceneItem)]
 
+    def get_pos_in_scene(self, pos_in_view):
+        return self.mapToScene(pos_in_view)
+
     def get_item_in_position(self, pos_in_view):
-        pos_in_scene = self.mapToScene(pos_in_view)
+        pos_in_scene = self.get_pos_in_scene(pos_in_view)
         for item1 in self.scene.items():
             item = item1.group()
             if item is None:
@@ -62,7 +75,7 @@ class EditableFigure(QGraphicsView):
             msg = 'Invalid items definition format, %s not present in %s' % (item_key, item_def)
             return msg
 
-        item, msg = get_item(item_def[item_key], self)
+        item, msg = SceneItem.create(item_def[item_key], self)
         if item is None:
             return msg
         self.scene.addItem(item)
@@ -98,8 +111,8 @@ class EditableFigure(QGraphicsView):
         :param position:
         :return:
         """
-        item_def = get_default_item(item_type, position)
-        item, msg = get_item(item_def['item'], self)
+        item_def  = get_default_item(item_type, position)
+        item, msg = SceneItem.create(item_def['item'], self)
         self.add_ui_command(AddItemCommand(self, item))
 
     def delete_item_from_ui(self, item_in_position):
@@ -136,7 +149,19 @@ class EditableFigure(QGraphicsView):
         for item in self.view.scene.selectedItems():
             yield item
 
-    def event_pos_to_pixel_point(self, event_pos):
+    def set_visible_type(self, item_type, value):
+        for item in self.items():
+            if not isinstance(item, SceneItem):
+                continue
+            if item.type == item_type:
+                item.setVisible(value)
+
+    def event_pos_to_point(self, event_pos):
+        """
+        Returns the corresponding point (in drawing reference frame) from a pixel point in view
+        :param event_pos:
+        :return:
+        """
         translate = QPointF(0, 0)
         return pixel_point_to_point(self.mapToScene(event_pos), self.scale_factor, translate)
 
@@ -149,10 +174,35 @@ class EditableFigure(QGraphicsView):
 
     def add_ui_command(self, command):
         """
-        Adds a UI command (like add o translate) that can be undone it
+        Adds a UI command (like add or translate) that can be undone it
         :param command:
         :return:
         """
+        self.undo_stack.push(command)
+
+    # copy paste
+    def on_copy(self):
+        cursor_pos = self.mapFromGlobal(self.cursor().pos())
+        scene_item = self.get_item_in_position(cursor_pos)
+        self.copy_item(scene_item)
+
+    def on_paste(self):
+        cursor_pos = self.mapFromGlobal(self.cursor().pos())
+        scene_pos  = self.get_pos_in_scene(cursor_pos)
+        self.paste_item(scene_pos)
+
+    def copy_item(self, scene_item):
+        self.copy_buffer = scene_item
+
+    def paste_item(self, scene_pos):
+        """
+        Paste the copied item in a given scene position
+        :param scene_pos:
+        :return:
+        """
+        if self.copy_buffer is None:
+            return
+        command = CopyPasteCommand(self, self.copy_buffer, scene_pos)
         self.undo_stack.push(command)
 
     # events
@@ -188,10 +238,26 @@ class EditableFigure(QGraphicsView):
             action1 = QAction(item_desc, self)
             context_menu.addAction(action1)
             action1.triggered.connect(functools.partial(self.add_item_from_ui, item_type,
-                                                        self.event_pos_to_pixel_point(event.pos())))
+                                                        self.event_pos_to_point(event.pos())))
 
         item_in_position = self.get_item_in_position(event.pos())
+
+        # copy paste
+        if item_in_position is not None or self.copy_buffer is not None:
+            context_menu.addSeparator()
+            # copy
+            if item_in_position is not None:
+                action_copy = QAction('Copy %s' % item_in_position.type_and_name(), self)
+                context_menu.addAction(action_copy)
+                action_copy.triggered.connect(functools.partial(self.copy_item, item_in_position))
+            # paste
+            if self.copy_buffer is not None:
+                action_paste = QAction('Paste', self)
+                context_menu.addAction(action_paste)
+                action_paste.triggered.connect(functools.partial(self.paste_item, self.get_pos_in_scene(event.pos())))
+
         if item_in_position is not None:
+            # delete
             context_menu.addSeparator()
             action_del = QAction('Delete %s' % item_in_position.type_and_name(), self)
             context_menu.addAction(action_del)
@@ -234,13 +300,34 @@ class SceneItem(QGraphicsItemGroup):
     tooltip_key = 'tooltip'
     width_key   = 'width'
 
+    @staticmethod
+    def create(item_def, view):
+        """
+        Create an SceneItem from its dict definition
+        :param item_def:
+        :param view:
+        :return: an SceneItem and a msg (in case the definition is wrong or incomplete)
+        """
+        if SceneItem.type_key not in item_def:
+            return None, '%s not present in %s, ignored' % (SceneItem.type_key, item_def)
+        item_type = item_def[SceneItem.type_key]
+        fail_msg = check_must_have_properties(item_type, item_def)
+        if fail_msg != '':
+            return None, fail_msg
+
+        const = items_metadata[item_type].get('const', None)
+        if const is not None:
+            return const(item_def, view), ''
+        else:
+            return None, '%s type is not implemented' % item_type
+
     def __init__(self, item_def, view):
         """
         Super class to define an item that can be
         :param item_def:  item definition :type dict
         :param view: view that host the item
         """
-        self.view = view
+        self.view         = view
         self.scale_factor = self.view.scale_factor  # keep the scale factor used in creation time
         super().__init__()
         if item_def.get(self.is_movable_key, False):
@@ -262,12 +349,10 @@ class SceneItem(QGraphicsItemGroup):
 
         self.handles = []  # handles are created only when the item is clicked
 
-    def end_resizing(self):
-        """
-        All housekeeping after resizing is finished
-        :return:
-        """
-        self.remove_handles()
+    def clone(self):
+        new_def       = copy.deepcopy(self.serialize())
+        new_item, msg = self.create(new_def, self.view)
+        return new_item
 
     # handles
     def set_handles(self):
@@ -281,6 +366,13 @@ class SceneItem(QGraphicsItemGroup):
     def get_handles(self):
         return []
 
+    def end_resizing(self):
+        """
+        All housekeeping after resizing is finished
+        :return:
+        """
+        self.remove_handles()
+
     # events
     def hoverEnterEvent(self, event):
         # print('mouse on %s' % self.name)
@@ -288,12 +380,12 @@ class SceneItem(QGraphicsItemGroup):
 
     # serialization
     def serialize(self):
-        self.update_def()
+        self.update_def_from_scene()
         return self.item_def
 
-    def update_def(self):
+    def update_def_from_scene(self):
         """
-        Update item definition with
+        Update item definition with scene info, typically used for updating position or size
         :return:
         """
         pass
@@ -303,6 +395,10 @@ class SceneItem(QGraphicsItemGroup):
 
 
 class SceneLine(SceneItem):
+    """
+    Represent a line
+    """
+
     def __init__(self, item_def, view):
         """
         Define a line
@@ -378,9 +474,9 @@ class SceneLine(SceneItem):
         handles = [handle_start, handle_end, handle_start_move, handle_end_move, handle_move]
         return handles
 
-    def update_def(self):
+    def update_def_from_scene(self):
         """
-        Update item definition with
+        Update item definition with scene info
         :return:
         """
         self.item_def[self.start_key] = self.start_point()
@@ -449,6 +545,10 @@ class SceneCircle(SceneItem):
         self.circle   = get_circle(center_pixels, radius_pixels)
         self.addToGroup(self.circle)
 
+    def contains(self, point: QPointF):
+        d = distance_in_pixels(self.center_pixel_point(), point)
+        return d < self.radius_pixels()
+
     def center_pixel_point(self):
         """
         Returns the circle's center in pixels
@@ -494,9 +594,9 @@ class SceneCircle(SceneItem):
         handles = [handle_enlarge, handle_move]
         return handles
 
-    def update_def(self):
+    def update_def_from_scene(self):
         """
-        Update item definition with
+        Update item definition with scene info
         :return:
         """
         self.item_def[self.center_key] = self.center()
@@ -507,6 +607,25 @@ class SceneCircle(SceneItem):
 
 
 # undo/redo commands
+class CopyPasteCommand(QUndoCommand):
+    def __init__(self, view, item, pos, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.view     = view
+        self.item     = item
+        self.new_item = None
+        self.pos      = pos
+
+    def redo(self):
+        self.new_item = self.item.clone()
+        self.new_item.translate(self.pos)
+        self.view.scene.addItem(self.new_item)
+
+    def undo(self):
+        if self.new_item is None:
+            return
+        self.view.scene.removeItem(self.new_item)
+
+
 class AddItemCommand(QUndoCommand):
     def __init__(self, view, item, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -786,21 +905,6 @@ class RotateHandle(Handle):
 
     def non_selected_end_point(self):
         return self.parent_item.p2() if self.is_start else self.parent_item.p1()
-
-
-def get_item(item_def, view):
-    if SceneItem.type_key not in item_def:
-        return None, '%s not present in %s, ignored' % (SceneItem.type_key, item_def)
-    item_type = item_def[SceneItem.type_key]
-    fail_msg  = check_must_have_properties(item_type, item_def)
-    if fail_msg != '':
-        return None, fail_msg
-
-    const = items_metadata[item_type].get('const', None)
-    if const is not None:
-        return const(item_def, view), ''
-    else:
-        return None, '%s type is not implemented' % item_type
 
 
 items_metadata = {'line':     {'const': SceneLine, 'props': [SceneItem.start_key, SceneItem.end_key]},
