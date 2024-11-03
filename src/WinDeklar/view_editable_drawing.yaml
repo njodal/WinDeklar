@@ -73,11 +73,11 @@ window:
                       action:  clear   # method to call
                       tooltip: Remove all items
                   - widget:
-                      name:    delete
-                      title:   Delete
-                      type:    Button
-                      action:  delete_selected_items   # method to call
-                      tooltip: Delete selected items
+                      name:    view_lines
+                      title:   View Lines
+                      type:    Check
+                      value:   True
+                      tooltip: View all lines (example to filter items)
 
             - item:
                 name:    figures

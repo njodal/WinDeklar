@@ -17,6 +17,7 @@ class ExampleHost(WinForm.HostModel):
 
     def __init__(self, file_name, default_directory='/tmp', file_extension='yaml'):
         # keys (names used in the yaml definition file)
+        self.view_lines_key = 'view_lines'
         self.points_key = 'points'
         self.axis_key   = 'show_axis'
         self.type_key   = 'graph_type'
@@ -45,8 +46,10 @@ class ExampleHost(WinForm.HostModel):
         :param value:
         :return:
         """
-        if name == self.type_key:
-            self.show_status_bar_msg('%s graph type chosen' % value)
+        if name == self.view_lines_key:
+            if self.figure is None:
+                return
+            self.figure.set_visible_type('line', value)
 
     def update_view(self, figure, ax):
         """
