@@ -516,10 +516,13 @@ class Menu:
         """
         :param parent:
         :param title:
-        :param actions: list of [action_name, function_to_call]
+        :param actions: list of [action_name, function_to_call] (['Separator', None] adds a separator)
         """
         self.menu = QtWidgets.QMenu(title, parent=parent)
         for [name, event] in actions:
+            if name == 'Separator' and event is None:
+                self.menu.addSeparator()
+                continue
             action = self.menu.addAction(name)
             action.triggered.connect(event)
 
