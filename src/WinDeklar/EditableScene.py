@@ -2,6 +2,8 @@ import copy
 import math
 import functools
 
+import QTAux as qt
+import WinDeklar.yaml_functions as yf
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, QMenu, QAction, QShortcut,\
     QGraphicsItem, QGraphicsLineItem, QGraphicsPolygonItem, QGraphicsItemGroup, QGraphicsRectItem, QUndoCommand
 from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF
@@ -20,9 +22,10 @@ class EditableFigure(QGraphicsView):
         :param scale_factor: factor to relate pixels to meters
         """
         super().__init__()
-        self.name   = config.get(self.name_key, 'no_name')
-        self.parent = parent
-        self.scene  = QGraphicsScene(self)
+        self.name     = config.get(self.name_key, 'no_name')
+        self.parent   = parent
+        self.metadata = get_metadata(self.parent)['items']
+        self.scene    = QGraphicsScene(self)
         self.setScene(self.scene)
 
         # undo functionality
@@ -70,6 +73,13 @@ class EditableFigure(QGraphicsView):
                 return item
         return None
 
+    def get_metadata_for_type(self, item_type):
+        for item1 in self.metadata:
+            item = item1['item']
+            if item['type'] == item_type:
+                return item
+        return None
+
     def add_item(self, item_def, item_key='item'):
         if item_key not in item_def:
             msg = 'Invalid items definition format, %s not present in %s' % (item_key, item_def)
@@ -111,8 +121,11 @@ class EditableFigure(QGraphicsView):
         :param position:
         :return:
         """
-        item_def  = get_default_item(item_type, position)
-        item, msg = SceneItem.create(item_def['item'], self)
+        item_def  = get_default_item(item_type, self.get_metadata_for_type(item_type))
+        item, msg = SceneItem.create(item_def, self)
+        if item is None:
+            return
+        item.translate(position)
         self.add_ui_command(AddItemCommand(self, item))
 
     def delete_item_from_ui(self, item_in_position):
@@ -232,38 +245,39 @@ class EditableFigure(QGraphicsView):
         :param event:
         :return:
         """
-        context_menu = QMenu()
-
-        for [item_type, item_desc] in [['line', 'Add line'], ['circle', 'Add circle']]:
-            action1 = QAction(item_desc, self)
-            context_menu.addAction(action1)
-            action1.triggered.connect(functools.partial(self.add_item_from_ui, item_type,
-                                                        self.event_pos_to_point(event.pos())))
+        actions = []
+        for item_metadata in self.metadata:
+            item = item_metadata['item']
+            if 'default' not in item:
+                # only include item who have default
+                continue
+            item_type = item['type']
+            pos_in_scene = self.get_pos_in_scene(event.pos())
+            add_event    = functools.partial(self.add_item_from_ui, item_type, pos_in_scene)
+            actions.append(['Add %s' % item_type, add_event])
 
         item_in_position = self.get_item_in_position(event.pos())
 
         # copy paste
         if item_in_position is not None or self.copy_buffer is not None:
-            context_menu.addSeparator()
+            actions.append(['Separator', None])
             # copy
             if item_in_position is not None:
-                action_copy = QAction('Copy %s' % item_in_position.type_and_name(), self)
-                context_menu.addAction(action_copy)
-                action_copy.triggered.connect(functools.partial(self.copy_item, item_in_position))
+                actions.append(['Copy %s' % item_in_position.type_and_name(),
+                                functools.partial(self.copy_item, item_in_position)])
             # paste
             if self.copy_buffer is not None:
-                action_paste = QAction('Paste', self)
-                context_menu.addAction(action_paste)
-                action_paste.triggered.connect(functools.partial(self.paste_item, self.get_pos_in_scene(event.pos())))
+                actions.append(['Paste %s' % self.copy_buffer.type_and_name(),
+                                functools.partial(self.paste_item, self.get_pos_in_scene(event.pos()))])
 
         if item_in_position is not None:
             # delete
-            context_menu.addSeparator()
-            action_del = QAction('Delete %s' % item_in_position.type_and_name(), self)
-            context_menu.addAction(action_del)
-            action_del.triggered.connect(functools.partial(self.delete_item_from_ui, item_in_position))
+            actions.append(['Separator', None])
+            actions.append(['Delete %s' % item_in_position.type_and_name(),
+                            functools.partial(self.delete_item_from_ui, item_in_position)])
 
-        context_menu.exec_(event.globalPos())
+        context_menu = qt.Menu(self, actions=actions)
+        context_menu.popup()
 
     def zoom_in(self):
         if self.current_zoom * self.zoom_factor < self.max_zoom:
@@ -303,7 +317,7 @@ class SceneItem(QGraphicsItemGroup):
     @staticmethod
     def create(item_def, view):
         """
-        Create an SceneItem from its dict definition
+        Create a SceneItem from its dict definition
         :param item_def:
         :param view:
         :return: an SceneItem and a msg (in case the definition is wrong or incomplete)
@@ -311,15 +325,19 @@ class SceneItem(QGraphicsItemGroup):
         if SceneItem.type_key not in item_def:
             return None, '%s not present in %s, ignored' % (SceneItem.type_key, item_def)
         item_type = item_def[SceneItem.type_key]
-        fail_msg = check_must_have_properties(item_type, item_def)
+        metadata = view.get_metadata_for_type(item_type)
+        if metadata is None:
+            return None, '%s type is not implemented' % item_type
+
+        fail_msg  = check_must_have_properties(item_def, metadata)
         if fail_msg != '':
             return None, fail_msg
 
-        const = items_metadata[item_type].get('const', None)
-        if const is not None:
-            return const(item_def, view), ''
+        constructor_name = metadata['constructor']
+        if constructor_name in globals() and callable(globals()[constructor_name]):
+            return globals()[constructor_name](item_def, view), ''
         else:
-            return None, '%s type is not implemented' % item_type
+            return None, '%s constructor name not implemented' % constructor_name
 
     def __init__(self, item_def, view):
         """
@@ -907,27 +925,32 @@ class RotateHandle(Handle):
         return self.parent_item.p2() if self.is_start else self.parent_item.p1()
 
 
-items_metadata = {'line':     {'const': SceneLine, 'props': [SceneItem.start_key, SceneItem.end_key]},
-                  'circle':   {'const': SceneCircle, 'props': [SceneItem.center_key, SceneItem.radius_key]},
-                  'corridor': {'const': SceneCorridor, 'props': [SceneItem.start_key, SceneItem.end_key]}}
+def get_metadata(parent, file_key='metadata_file_name', default_name='editable_items_metadata.yaml'):
+    """
+    Returns the items' metadata
+    :param default_name:
+    :param file_key:
+    :param parent:
+    :return: :type dict
+    """
+    file_name = getattr(parent, file_key) if hasattr(parent, file_key) else None
+    if file_name is None:
+        file_name = default_name
+    metadata = yf.get_yaml_file(file_name, directory=None)
+    return metadata
 
 
-def get_default_item(item_type, position):
-    if item_type == 'line':
-        length = 1.0
-        start  = [position[0]-length/2, position[1]]
-        end    = [position[0]+length/2, position[1]]
-        return {'item': {'type': item_type, 'start': start, 'end': end}}
-    elif item_type == 'circle':
-        radius = 0.5
-        return {'item': {'type': item_type, 'center': position, 'radius': radius}}
-    else:
-        print('No default creation for %s' % item_type)
+def get_default_item(item_type, metadata, default_key='default'):
+    if default_key not in metadata:
+        print('Not default values for type %s' % item_type)
         return {}
+    default_def         = metadata[default_key]
+    default_def['type'] = item_type
+    return default_def
 
 
-def check_must_have_properties(item_type, item_def):
-    for key in items_metadata.get(item_type, [])['props']:
+def check_must_have_properties(item_def, metadata, req_key='required_properties'):
+    for key in metadata[req_key]:
         if key not in item_def:
             return '%s not present in %s, ignored' % (key, item_def)
     return ''  # all required properties are presents

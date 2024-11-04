@@ -28,6 +28,7 @@ class ExampleHost(WinForm.HostModel):
 
         # particular data
         self.figure    = None
+        self.metadata_file_name = None
 
         self.action_name        = 'Action'
         self.last_action_number = 0
