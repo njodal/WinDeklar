@@ -1,0 +1,35 @@
+window:
+  size: [100, 50, 500, 400]  # [start_x, start_y, width, height]
+  title: Input panel
+  layout:
+    - item:
+        name:    main
+        type:    grid
+        subtype: vertical
+        layout:
+              - item:
+                  name:    controls
+                  type:    grid
+                  subtype: vertical
+                  widgets:
+                    - widget:
+                        name:    name
+                        title:   Name
+                        type:    EditText
+                        value:   Name
+
+              - item:
+                  name:    buttons
+                  type:    grid
+                  subtype: horizontal
+                  widgets:
+                    - widget:
+                        name:    confirm     # internal name (used in programs), if changed need to change program also
+                        title:   Confirm     # external name, can be changed without problem
+                        type:    Button      # type of control: Check, Slider, Button
+                        action:  button_confirm
+                    - widget:
+                        name:    cancel      # internal name (used in programs), if changed need to change program also
+                        title:   Cancel      # external name, can be changed without problem
+                        type:    Button      # type of control: Check, Slider, Button
+                        action:  button_cancel

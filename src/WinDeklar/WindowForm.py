@@ -438,7 +438,14 @@ class Dialog(QtWidgets.QDialog):
     Functionality for an Input Panel
     """
 
-    def __init__(self, dialog_name, provider, default_size=(300, 300, 400, 400)):
+    def __init__(self, dialog_name, provider, dialog_config=None, default_size=(300, 300, 400, 400)):
+        """
+
+        :param dialog_name: file name with the dialog definition, only used if win_config is None
+        :param provider:
+        :param dialog_config:  dialog configuration :type dict
+        :param default_size:
+        """
         super(Dialog, self).__init__(parent=None)
 
         self.widgets   = []
@@ -446,7 +453,7 @@ class Dialog(QtWidgets.QDialog):
         self.provider  = provider
         self.provider.set_main_window(self)
 
-        self.win_config = get_win_config(dialog_name)
+        self.win_config = get_win_config(dialog_name) if dialog_config is None else dialog_config.get('window', {})
 
         # Define the geometry of the main window
         size = self.win_config.get('size', default_size)
@@ -874,7 +881,7 @@ class PropertiesHost(HostModel):
     HostModel specialized for editing a set of properties (defined as a dict)
     """
 
-    def __init__(self, dialog_name, properties):
+    def __init__(self, dialog_name, properties, dialog_config=None):
         self.dialog_name   = dialog_name  # config name for the dialog
         self.properties    = properties
         self.changed       = {}
@@ -883,7 +890,7 @@ class PropertiesHost(HostModel):
         self.status_msg = 'Show %s' % self.dialog_name
         initial_values = self.properties.copy()
         super(PropertiesHost, self).__init__(initial_values=initial_values)
-        self.dialog = Dialog(self.dialog_name, self)
+        self.dialog = Dialog(self.dialog_name, self, dialog_config=dialog_config)
 
     def set_properties(self, properties):
         self.properties = properties

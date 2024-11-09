@@ -3,16 +3,22 @@ items:
   - item:
       type:  corridor
       name:  corridor one
-      start: [-1.0, -1.0]
-      end:   [1.0, -1.0]
-      width: 0.2
+      color: green
+      start: [-2.0, -1.0]
+      end:   [2.0, -1.0]
+      corridor_width: 0.2
+      width: 0.05
   - item:
-      type: circle
-      name: first circle
+      type:   circle
+      name:   first circle
+      color:  blue
+      width:  0.01
       center: [0, 0]
       radius: 0.5
   - item:
       type:  line
       name:  first line
+      color:  red
+      width:  0.1
       start: [0.0, 0.0]
       end:   [1.0, 2.0]

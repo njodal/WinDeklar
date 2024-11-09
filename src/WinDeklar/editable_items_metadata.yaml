@@ -5,6 +5,7 @@ items:
       type: line
       constructor: SceneLine
       required_properties: [start, end]
+      editable_properties: [name, description, width, color]
       default:
         start: [ -1.0, 0.0 ]
         end:   [ 1.0, 0.0 ]
@@ -13,6 +14,7 @@ items:
       type: circle
       constructor: SceneCircle
       required_properties: [center, radius]
+      editable_properties: [name, description, color]
       default:
         center: [ 0.0, 0.0 ]
         radius: 0.5
@@ -21,8 +23,36 @@ items:
       type: corridor
       constructor: SceneCorridor
       required_properties: [start, end]
+      editable_properties: [name, description, corridor_width, color]
       default:
         start: [ -1.0, 0.0 ]
         end:   [ 1.0, 0.0 ]
         width: 0.2
 
+properties:
+  - property:
+      name:    name
+      title:   Name
+      type:    EditText
+      tooltip: Item's name
+  - property:
+      name:    description
+      title:   Description
+      type:    EditText
+      tooltip: A brief item's description
+  - property:
+      name:    width
+      title:   Width
+      type:    EditNumberSpin
+      parms:   {step: 0.1, maximum: 10}
+      value:   0.5
+  - property:
+      name:    corridor_width
+      title:   Width
+      type:    EditNumberSpin
+      parms:   {step: 0.1, maximum: 10}
+      value:   0.5
+  - property:
+      name:  color
+      title: Color
+      type:  EditText
