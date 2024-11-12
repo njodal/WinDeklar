@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem,
     QGraphicsOpacityEffect, QGraphicsItem, QGraphicsLineItem, QGraphicsPolygonItem, QGraphicsItemGroup, \
     QGraphicsRectItem, QUndoCommand
 from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF
-from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence
+from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence, QTransform, QBrush
 
 
 class EditableFigure(QGraphicsView):
@@ -231,7 +231,7 @@ class EditableFigure(QGraphicsView):
         if self.copy_buffer is None:
             return
         command = CopyPasteCommand(self, self.copy_buffer, scene_pos)
-        self.undo_stack.push(command)
+        self.add_ui_command(command)
 
     # events
     def mousePressEvent(self, event):
@@ -341,6 +341,7 @@ class SceneItem(QGraphicsItemGroup):
     radius_key  = 'radius'
     tooltip_key = 'tooltip'
     width_key   = 'width'
+    height_key  = 'height'
 
     @staticmethod
     def create(item_def, view):
@@ -402,20 +403,19 @@ class SceneItem(QGraphicsItemGroup):
         self.name  = self.item_def.get(EditableFigure.name_key, '')
         self.type  = self.item_def.get(EditableFigure.type_key, '')
         self.color = self.item_def.get(EditableFigure.color_key, None)
-        self.alpha = self.item_def.get(EditableFigure.alpha_key, 1.0)
+        self.alpha = self.item_def.get(EditableFigure.alpha_key, 5)
         self.width = scale(self.item_def.get(self.width_key, 0.01), self.scale_factor)
 
         tooltip = self.item_def.get(self.tooltip_key, self.name)
         if tooltip != '':
             self.setToolTip(tooltip)
 
-        if self.color is not None and self.color != '':
-            self.pen.setColor(QColor(self.color))
-        self.pen.setWidth(self.width)
+        self.set_color()
+        self.set_border_width()
 
         if self.alpha is not None:
             opacity_effect = QGraphicsOpacityEffect()
-            opacity_effect.setOpacity(self.alpha)
+            opacity_effect.setOpacity(self.alpha/10)
             self.setGraphicsEffect(opacity_effect)
 
     def set_pen(self):
@@ -424,6 +424,15 @@ class SceneItem(QGraphicsItemGroup):
         :return:
         """
         pass
+
+    def set_color(self):
+        if self.color is None or self.color == '':
+            return
+        self.pen.setColor(QColor(self.color))
+
+    def set_border_width(self):
+        self.pen.setCapStyle(Qt.FlatCap)
+        self.pen.setWidth(self.width)
 
     def clone(self):
         new_def       = copy.deepcopy(self.serialize())
@@ -460,7 +469,7 @@ class SceneItem(QGraphicsItemGroup):
         properties_window   = wf.PropertiesHost(dialog_full_name, editable_properties, dialog_config=dialog_config)
         changed             = properties_window.show()
         command             = ChangePropertiesCommand(self, changed)
-        self.view.undo_stack.push(command)
+        self.view.add_ui_command(command)
 
     def update_properties(self, new_properties):
         # print('new properties: %s' % new_properties)
@@ -522,7 +531,8 @@ class SceneLine(SceneItem):
         end_point          = item_def[SceneItem.end_key]
         start_point_pixels = point_to_pixel_point(start_point, self.scale_factor)
         end_point_pixels   = point_to_pixel_point(end_point, self.scale_factor)
-        self.line          = QGraphicsLineItem(QLineF(start_point_pixels, end_point_pixels))
+        original_line      = QLineF(start_point_pixels, end_point_pixels)
+        self.line          = QGraphicsLineItem(original_line)
         self.set_pen()
         self.addToGroup(self.line)
 
@@ -613,9 +623,11 @@ class SceneCorridor(SceneLine):
         self.corridor_width = scale(item_def.get('corridor_width', 1.0), self.scale_factor)
         self.center_line    = QGraphicsLineItem(self.line.line())
         center_line_pen     = QPen()
-        center_line_pen.setColor(QColor('black'))
+        center_line_color   = QColor('black')
+        center_line_color.setAlpha(255)
+        center_line_pen.setColor(center_line_color)
         center_line_pen.setStyle(Qt.DashLine)
-        center_line_pen.setWidth(3.0)
+        center_line_pen.setWidth(1)
         self.center_line.setPen(center_line_pen)
         self.addToGroup(self.center_line)
 
@@ -640,6 +652,7 @@ class SceneCorridor(SceneLine):
 
     # update
     def update_others(self):
+        self.center_line.setLine(self.line.line())
         self.update_borders()
 
     def update_borders(self):
@@ -647,10 +660,11 @@ class SceneCorridor(SceneLine):
         Make borders consistent with central line
         :return:
         """
+        if not self.item_def.get('show_borders', False):
+            return
         lines = self.get_borders_lines()
         self.border1.setLine(lines[0])
         self.border2.setLine(lines[1])
-        self.center_line.setLine(self.line.line())
 
     def __str__(self):
         return 'corridor %s,%s' % (self.start_point(), self.end_point())
@@ -732,6 +746,95 @@ class SceneCircle(SceneItem):
 
     def __str__(self):
         return 'circle %s,%s' % (self.center(), self.radius())
+
+
+class SceneRectangle(SceneItem):
+    def __init__(self, item_def, view):
+        """
+        Define a rectangle from a center, width, height and rotation
+        """
+        self.rectangle    = None  # to avoid crash in set_color
+        self.border_width = item_def.get('border_width', 1)
+        super().__init__(item_def, view)
+        self.rectangle = self.get_rectangle()
+        self.set_pen()
+        self.addToGroup(self.rectangle)
+
+    def get_rectangle(self):
+        center_point  = self.item_def[SceneItem.center_key]
+        center_pixels = point_to_pixel_point(center_point, self.scale_factor)
+        rotation      = self.item_def.get('rotation', 0)
+        width_pixels  = scale(self.item_def.get(SceneItem.width_key, 1), self.scale_factor)
+        height_pixels = scale(self.item_def.get(SceneItem.height_key, 1), self.scale_factor)
+        return get_rectangle(center_pixels, width_pixels, height_pixels, rotation)
+
+    def set_pen(self):
+        self.set_color()
+        self.rectangle.setPen(self.pen)
+
+    def set_color(self):
+        if self.rectangle is None or self.color is None or self.color == '':
+            return
+        brush = QBrush(QColor(self.color))
+        self.rectangle.setBrush(brush)
+
+    def set_border_width(self):
+        self.pen.setWidth(self.border_width)
+
+    def contains(self, point: QPointF):
+        local_point = self.rectangle.mapFromScene(point)
+        return self.rectangle.rect().contains(local_point)
+
+    def center_pixel_point(self):
+        """
+        Returns the circle's center in pixels
+        :return:
+        """
+        local_center = self.rectangle.rect().center()
+        scene_center = self.rectangle.mapToScene(local_center)
+        return scene_center
+
+    def center(self):
+        """
+        Returns the circle's center in meters
+        :return:
+        """
+        return pixel_point_to_point(self.center_pixel_point(), self.scale_factor, self.pos())
+
+    # update
+    def translate(self, translation):
+        bounding_rect = self.rectangle.rect()
+        self.rectangle.setRect(bounding_rect.x() + translation.x(), bounding_rect.y() + translation.y(),
+                               bounding_rect.width(), bounding_rect.height())
+
+    def update_width(self, new_width):
+        pass
+
+    def update_height(self, new_width):
+        pass
+
+    # handles
+    def get_handles(self):
+        # handle_enlarge = ChangeSizeHandle(self)
+        handle_move    = MoveHandle(self)              # move the whole item
+        handles = [handle_move]
+        return handles
+
+    def update_def_from_scene(self):
+        """
+        Update item definition with scene info
+        :return:
+        """
+        rect = self.rectangle.rect()
+        self.item_def[self.center_key] = self.center()
+        self.item_def[self.width_key]  = de_scale(rect.width(), self.scale_factor)
+        self.item_def[self.height_key] = de_scale(rect.height(), self.scale_factor)
+        self.item_def['rotation']      = self.rectangle.rotation()
+
+    def __str__(self):
+        self.update_def_from_scene()
+        return 'rectangle %s (%s x %s)' % (self.item_def[self.center_key], self.item_def[self.width_key],
+                                           self.item_def[self.height_key])
 
 
 # undo/redo commands
@@ -1103,6 +1206,28 @@ def get_circle(center_point, radius):
     width  = radius*2
     height = width
     return QGraphicsEllipseItem(x, y, width, height)
+
+
+def get_rectangle(center: QPointF, width, height, rotation):
+    """
+    Returns a rectangle centered in center, with the given width and height and rotated rotation
+    :param center:
+    :param width:
+    :param height:
+    :param rotation:
+    :return:
+    """
+    rect_item = QGraphicsRectItem(-width / 2, -height / 2, width, height)
+
+    rect_item.setPos(center)
+
+    transform = QTransform()
+    transform.translate(center.x(), center.y())
+    transform.rotate(rotation)
+    transform.translate(-center.x(), -center.y())
+    rect_item.setTransform(transform)
+
+    return rect_item
 
 
 # auxiliary functions

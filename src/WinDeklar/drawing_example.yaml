@@ -4,11 +4,22 @@ items:
       type:  corridor
       name:  corridor one
       color: gray
-      alpha: 0.1
+      alpha: 5
       start: [-2.0, -1.0]
       end:   [2.0, -1.0]
       corridor_width: 0.2
+      show_borders: True
       width: 0.2
+  - item:
+      type:  rectangle
+      name:  rectangle one
+      color: green
+      alpha: 2
+      center: [-1, 0]
+      width:  1
+      height: 2
+      rotation: 0.0
+      show_borders: False
   - item:
       type:   circle
       name:   first circle
@@ -20,7 +31,7 @@ items:
       type:  line
       name:  first line
       color: red
-      alpha: 0.2
+      alpha: 2
       width: 0.1
       start: [0.0, 0.0]
       end:   [1.0, 2.0]
