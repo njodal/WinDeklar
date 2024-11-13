@@ -7,10 +7,11 @@ import WindowForm as wf
 import WinDeklar.yaml_functions as yf
 
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, QShortcut, \
-    QGraphicsOpacityEffect, QGraphicsItem, QGraphicsLineItem, QGraphicsPolygonItem, QGraphicsItemGroup, \
-    QGraphicsRectItem, QUndoCommand
+    QGraphicsOpacityEffect, QGraphicsItem, QGraphicsLineItem, QGraphicsItemGroup, \
+    QGraphicsRectItem, QUndoCommand, QGraphicsPixmapItem
 from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF
-from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence, QTransform, QBrush
+from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence, QTransform, QBrush, QPixmap, QPainter
 
 
 class EditableFigure(QGraphicsView):
@@ -958,10 +959,26 @@ class Handle(QGraphicsItemGroup):
     """
     Base class for Handle associated to a parent item. Useful to enlarge, rotate, etc., the parent item
     """
-    def __init__(self, parent_item):
-        self.parent_item = parent_item
-
+    def __init__(self, parent_item, icon_name=None, size=15):
         super().__init__()
+        self.parent_item    = parent_item
+        self.size           = size
+        self.icon_translate = QPointF(self.size/2, self.size/2)
+        # self.icon_translate = QPointF(0, 0)
+        if icon_name is not None:
+            pixmap = QPixmap(self.size, self.size)
+            pixmap.fill(Qt.transparent)
+            svg_renderer = QSvgRenderer(icon_name)
+            painter = QPainter(pixmap)
+            svg_renderer.render(painter)
+            painter.end()
+
+            # pixmap         = QPixmap(icon_name).scaled(size, size)
+            self.icon_item = QGraphicsPixmapItem(pixmap)
+            self.addToGroup(self.icon_item)
+        else:
+            self.icon_item = None
+
         self.setFlag(QGraphicsItem.ItemIsMovable)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)  # to send itemChange
         # self.setParentItem(self.parent_item)
@@ -974,7 +991,17 @@ class Handle(QGraphicsItemGroup):
         Position the handle in the scene (depending on where the parent is)
         :return:
         """
-        pass
+        pos, rotation = self.get_pos_and_rotation()
+        self.icon_item.setPos(pos - self.icon_translate)
+        self.icon_item.setTransformOriginPoint(self.icon_item.boundingRect().center())
+        self.icon_item.setRotation(rotation)
+
+    def get_pos_and_rotation(self):
+        """
+        Abstract method
+        :return:
+        """
+        return QPointF(0.0, 0.0), 0
 
     def update_parent(self, new_position):
         """
@@ -1010,28 +1037,24 @@ class ChangeEndPointHandle(Handle):
     """
     Handle to change one of the end points of a line
     """
-    def __init__(self, parent_line, is_start, size=10, arrow_angle_degrees=30, color=(255, 255, 255)):
-        self.size         = size
-        self.arrow_angle  = arrow_angle_degrees
+    def __init__(self, parent_line, is_start, icon_name='icons/Move-horizontal-01.svg'):
         self.is_start     = is_start
-        self.polygon      = QGraphicsPolygonItem()   # property initialed with move_to_parent
-        self.polygon.setBrush(QColor(color[0], color[1], color[2]))
-
-        super().__init__(parent_line)
-        self.addToGroup(self.polygon)
+        super().__init__(parent_line, icon_name=icon_name)
 
     def ordered_end_points(self):
         return [self.parent_item.p2(), self.parent_item.p1()] if self.is_start else \
             [self.parent_item.p1(), self.parent_item.p2()]
 
-    def move_to_parent(self):
+    def get_pos_and_rotation(self):
         """
         Position the handle in the scene (depending on where the parent is)
         :return:
         """
-        pp1, pp2     = self.ordered_end_points()
-        polygon      = get_arrow_head(pp1, pp2, self.size, arrow_angle_degrees=self.arrow_angle)
-        self.polygon = QGraphicsPolygonItem(polygon)
+        pp1, pp2 = self.ordered_end_points()
+        dx       = pp1.x() - pp2.x()
+        dy       = pp1.y() - pp2.y()
+        angle    = math.degrees(math.atan2(dy, dx))
+        return pp2, angle
 
     def update_parent(self, new_position):
         """
@@ -1039,7 +1062,7 @@ class ChangeEndPointHandle(Handle):
         :param new_position:
         :return:
         """
-        vertex_value  = self.polygon.polygon().last() + new_position
+        vertex_value  = self.icon_item.pos() + new_position
         value_in_line = project_pixel_point_to_segment(self.parent_item.p1(), self.parent_item.p2(),
                                                        vertex_value, in_segment=False)
         command  = ChangeEndPointCommand(self.parent_item, self.is_start, value_in_line)
@@ -1050,21 +1073,14 @@ class ChangeSizeHandle(Handle):
     """
     Handle to change the size (like radius) of an Item
     """
-    def __init__(self, parent_item, size=(-5, -5, 10, 10),
-                 color=(255, 255, 255)):
+    def __init__(self, parent_item, icon_name='icons/Move-horizontal-01.svg'):
+        super().__init__(parent_item, icon_name=icon_name)
 
-        self.circle = QGraphicsEllipseItem(size[0], size[1], size[2], size[3])  # property initialed with move_to_parent
-        self.circle.setBrush(QColor(color[0], color[1], color[2]))
-
-        super().__init__(parent_item)
-        self.addToGroup(self.circle)
+    def get_pos_and_rotation(self):
         center = self.parent_item.center_pixel_point()
         radius = self.parent_item.radius_pixels()
         pp1    = QPointF(center.x() + radius, center.y())
-        self.circle.setPos(pp1)
-
-    def move_to_parent(self):
-        pass
+        return pp1, 0
 
     def update_parent(self, new_position):
         """
@@ -1072,9 +1088,9 @@ class ChangeSizeHandle(Handle):
         :param new_position: note that new_position is relative to parent
         :return:
         """
-        self.circle.setPos(self.circle.pos() + new_position)
+        # self.circle.setPos(self.circle.pos() + new_position)
         center   = self.parent_item.center_pixel_point()
-        new_size = distance_in_pixels(center, self.circle.pos())
+        new_size = distance_in_pixels(center, self.icon_item.pos() + new_position)
         command  = ChangeSizeCommand(self.parent_item, new_size)
         self.parent_item.view.add_ui_command(command)
 
@@ -1083,22 +1099,16 @@ class MoveHandle(Handle):
     """
     Handle to move an item
     """
-    def __init__(self, parent_item, size=10, color=(255, 255, 255)):
-        self.size      = size
-        self.rectangle = QGraphicsRectItem()  # property initialed with move_to_parent
-        self.rectangle.setBrush(QColor(color[0], color[1], color[2]))
+    def __init__(self, parent_item, icon_name="icons/Move-07.svg"):
+        super().__init__(parent_item, icon_name=icon_name)
 
-        super().__init__(parent_item)
-        self.addToGroup(self.rectangle)
-
-    def move_to_parent(self):
+    def get_pos_and_rotation(self):
         """
         Position the handle in the scene (depending on where the parent is)
         :return:
         """
-        pos            = self.parent_item.center_pixel_point()
-        rectangle      = QRectF(pos.x()-self.size/2, pos.y()-self.size/2, self.size, self.size)
-        self.rectangle = QGraphicsRectItem(rectangle)
+        pos = self.parent_item.center_pixel_point()
+        return pos, 0
 
     def update_parent(self, new_position):
         """
@@ -1114,21 +1124,16 @@ class RotateHandle(Handle):
     """
     Handle to rotate a line around one of its end points
     """
-    def __init__(self, parent_line, is_start, percentage=0.8, size=(-5, -5, 10, 10),
-                 color=(255, 255, 255)):
+    def __init__(self, parent_line, is_start, percentage=0.8, icon_name='icons/Arrows-ccw-01.svg'):
         self.is_start   = is_start
         self.percentage = percentage
 
-        self.circle = QGraphicsEllipseItem(size[0], size[1], size[2], size[3])  # property initialed with move_to_parent
-        self.circle.setBrush(QColor(color[0], color[1], color[2]))
+        super().__init__(parent_line, icon_name=icon_name)
 
-        super().__init__(parent_line)
-        self.addToGroup(self.circle)
-
-    def move_to_parent(self):
+    def get_pos_and_rotation(self):
         pp1, pp2 = self.ordered_end_points()
         pp3      = get_point_at_t_pixels(pp1, pp2, t=self.percentage)
-        self.circle.setPos(pp3)
+        return pp3, 0
 
     def update_parent(self, new_position):
         """
@@ -1138,7 +1143,7 @@ class RotateHandle(Handle):
         """
         length = self.parent_item.length_in_pixels()
         pp1    = self.non_selected_end_point()
-        pp2    = translate_pixel_point(self.circle.pos(), new_position)
+        pp2    = translate_pixel_point(self.icon_item.pos(), new_position)
         p1, p2 = pixel_points_to_point([pp1, pp2])
         p3     = point_between_points_at_distance(p1, p2, length)
         pp3    = point_to_pixel_point(p3, 1.0)
