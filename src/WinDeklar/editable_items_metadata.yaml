@@ -23,7 +23,7 @@ items:
       type: rectangle
       constructor: SceneRectangle
       required_properties: [center, width, height]
-      editable_properties: [name, description, color, alpha]
+      editable_properties: [name, description, width, height, rotation, color, alpha]
       default:
         center: [ 0.0, 0.0 ]
         width:  1.0
@@ -57,7 +57,13 @@ properties:
       name:    width
       title:   Width
       type:    EditNumberSpin
-      parms:   {step: 0.1, maximum: 10}
+      parms:   {step: 0.1, maximum: 100}
+      value:   0.5
+  - property:
+      name:    height
+      title:   Height
+      type:    EditNumberSpin
+      parms:   {step: 0.1, maximum: 100}
       value:   0.5
   - property:
       name:  color
@@ -69,3 +75,9 @@ properties:
       type:  Slider
       parms: [0, 10, 1]      # [min_value, max_value, scale]
       value: 5
+  - property:
+      name:  rotation
+      title: Rotation
+      type:  Slider
+      parms: [-90, 90, 1]      # [min_value, max_value, scale]
+      value: 0

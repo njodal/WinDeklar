@@ -2,8 +2,8 @@ import copy
 import math
 import functools
 
-import QTAux as qt
-import WindowForm as wf
+import WinDeklar.QTAux as qt
+import WinDeklar.WindowForm as wf
 import WinDeklar.yaml_functions as yf
 
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, QShortcut, \
@@ -23,6 +23,11 @@ class EditableFigure(QGraphicsView):
     alpha_key   = 'alpha'
     widgets_key = 'widgets'
     widget_key  = 'widget'
+    window_key  = 'window'
+    layout_key  = 'layout'
+    size_key    = 'size'
+    props_key   = 'properties'
+    prop_key    = 'property'
 
     def __init__(self, parent, config, multiple_selection=True, scale_factor=100,
                  edit_panel_name='input_panel_template.yaml'):
@@ -40,7 +45,7 @@ class EditableFigure(QGraphicsView):
 
         self.metadata       = get_metadata(self.parent)
         self.items_metadata = self.metadata.get(EditableFigure.items_key, [])
-        self.props_metadata = self.metadata.get('properties', [])
+        self.props_metadata = self.metadata.get(EditableFigure.props_key, [])
         self.edit_template  = yf.get_yaml_file(edit_panel_name, directory=None)
 
         self.scene    = QGraphicsScene(self)
@@ -336,13 +341,14 @@ class SceneItem(QGraphicsItemGroup):
     """
     is_movable_key    = 'is_movable'
     is_selectable_key = 'is_selectable'
-    start_key   = 'start'
-    end_key     = 'end'
-    center_key  = 'center'
-    radius_key  = 'radius'
-    tooltip_key = 'tooltip'
-    width_key   = 'width'
-    height_key  = 'height'
+    start_key    = 'start'
+    end_key      = 'end'
+    center_key   = 'center'
+    radius_key   = 'radius'
+    tooltip_key  = 'tooltip'
+    width_key    = 'width'
+    height_key   = 'height'
+    rotation_key = 'rotation'
 
     @staticmethod
     def create(item_def, view):
@@ -491,18 +497,25 @@ class SceneItem(QGraphicsItemGroup):
                       in self.view.get_metadata_for_type(self.type).get('editable_properties', [])}
         return properties
 
-    def get_edit_dialog_config(self, editable_properties):
+    def get_edit_dialog_config(self, editable_properties, widget_height=50, buttons_height=100):
         dialog_config = self.view.edit_template.copy()
         # add specific properties
-        it_key  = EditableFigure.item_key
-        widgets = dialog_config['window']['layout'][0][it_key]['layout'][0][it_key][EditableFigure.widgets_key]
+        it_key   = EditableFigure.item_key
+        win_key  = EditableFigure.window_key
+        lay_key  = EditableFigure.layout_key
+        size_key = EditableFigure.size_key
+        widgets  = dialog_config[win_key][lay_key][0][it_key][lay_key][0][it_key][EditableFigure.widgets_key]
         widgets.clear()
         for k in editable_properties:
             for p1 in self.view.props_metadata:
-                p = p1['property']
+                p = p1[EditableFigure.prop_key]
                 if k == p[EditableFigure.name_key]:
                     widget_def = {EditableFigure.widget_key: p}
                     widgets.append(widget_def)
+
+        # dynamically adjust height so all controls fit
+        dialog_config[win_key][size_key][3] = widget_height*len(widgets) + buttons_height
+
         return dialog_config
 
     # events
@@ -750,20 +763,30 @@ class SceneRectangle(SceneItem):
         """
         Define a rectangle from a center, width, height and rotation
         """
-        self.rectangle    = None  # to avoid crash in set_color
+        self.rectangle    = QGraphicsRectItem()
         self.border_width = item_def.get('border_width', 1)
+
         super().__init__(item_def, view)
-        self.rectangle = self.get_rectangle()
+
+        self.set_rectangle()
         self.set_pen()
         self.addToGroup(self.rectangle)
 
-    def get_rectangle(self):
-        center_point  = self.item_def[SceneItem.center_key]
-        center_pixels = point_to_pixel_point(center_point, self.scale_factor)
-        rotation      = self.item_def.get('rotation', 0)
+    def get_rect_params_in_pixels(self):
+        rotation      = self.item_def.get(SceneItem.rotation_key, 0)
         width_pixels  = scale(self.item_def.get(SceneItem.width_key, 1), self.scale_factor)
         height_pixels = scale(self.item_def.get(SceneItem.height_key, 1), self.scale_factor)
-        return get_rectangle(center_pixels, width_pixels, height_pixels, rotation)
+        return width_pixels, height_pixels, rotation
+
+    def set_rectangle(self):
+        """
+        Returns the rectangle from its definition
+        :return:
+        """
+        center_point  = self.item_def[SceneItem.center_key]
+        center_pixels = point_to_pixel_point(center_point, self.scale_factor)
+        width_pixels, height_pixels, rotation = self.get_rect_params_in_pixels()
+        set_rectangle(self.rectangle, center_pixels, width_pixels, height_pixels, rotation)
 
     def set_pen(self):
         self.set_color()
@@ -799,10 +822,15 @@ class SceneRectangle(SceneItem):
         return pixel_point_to_point(self.center_pixel_point(), self.scale_factor, self.pos())
 
     # update
+    def update_others(self):
+        width, height, rotation = self.get_rect_params_in_pixels()
+        new_center = self.center_pixel_point()
+        set_rectangle(self.rectangle, new_center, width, height, rotation)
+
     def translate(self, translation):
-        bounding_rect = self.rectangle.rect()
-        self.rectangle.setRect(bounding_rect.x() + translation.x(), bounding_rect.y() + translation.y(),
-                               bounding_rect.width(), bounding_rect.height())
+        width, height, rotation = self.get_rect_params_in_pixels()
+        new_center = self.center_pixel_point() + translation
+        set_rectangle(self.rectangle, new_center, width, height, rotation)
 
     def update_width(self, new_width):
         pass
@@ -823,10 +851,10 @@ class SceneRectangle(SceneItem):
         :return:
         """
         rect = self.rectangle.rect()
-        self.item_def[self.center_key] = self.center()
-        self.item_def[self.width_key]  = de_scale(rect.width(), self.scale_factor)
-        self.item_def[self.height_key] = de_scale(rect.height(), self.scale_factor)
-        self.item_def['rotation']      = self.rectangle.rotation()
+        self.item_def[self.center_key]   = self.center()
+        self.item_def[self.width_key]    = de_scale(rect.width(), self.scale_factor)
+        self.item_def[self.height_key]   = de_scale(rect.height(), self.scale_factor)
+        self.item_def[self.rotation_key] = self.rectangle.rotation()
 
     def __str__(self):
         self.update_def_from_scene()
@@ -994,7 +1022,7 @@ class Handle(QGraphicsItemGroup):
 
     def get_pos_and_rotation(self):
         """
-        Abstract method
+        Abstract method, returns the position and rotation of the handle
         :return:
         """
         return QPointF(0.0, 0.0), 0
@@ -1209,26 +1237,19 @@ def get_circle(center_point, radius):
     return QGraphicsEllipseItem(x, y, width, height)
 
 
-def get_rectangle(center: QPointF, width, height, rotation):
+def set_rectangle(rectangle: QGraphicsRectItem, center: QPointF, width, height, rotation):
     """
-    Returns a rectangle centered in center, with the given width and height and rotated rotation
+    Set the position, width, height and rotation of a given rectangle
+    :param rectangle:
     :param center:
     :param width:
     :param height:
     :param rotation:
     :return:
     """
-    rect_item = QGraphicsRectItem(-width / 2, -height / 2, width, height)
-
-    rect_item.setPos(center)
-
-    transform = QTransform()
-    transform.translate(center.x(), center.y())
-    transform.rotate(rotation)
-    transform.translate(-center.x(), -center.y())
-    rect_item.setTransform(transform)
-
-    return rect_item
+    rectangle.setRect(center.x() - width/2, center.y() - height/2, width, height)
+    rectangle.setTransformOriginPoint(center)
+    rectangle.setRotation(rotation)
 
 
 # auxiliary functions

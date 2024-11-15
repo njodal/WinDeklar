@@ -3,8 +3,7 @@
 import sys
 import time
 
-import WindowForm as WinForm
-import points_box as pb
+import WinDeklar.WindowForm as WinForm
 import WinDeklar.QTAux as QTAux
 import WinDeklar.record as rc
 import WinDeklar.yaml_functions as ya

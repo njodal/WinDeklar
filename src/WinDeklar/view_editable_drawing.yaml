@@ -19,32 +19,16 @@ window:
           - item:
               title: 'Save as ...'
               action: event_save_file_as
-          - item:
-              is_separator: True
-          - item:
-              title: 'Item after separator'
-    - item:
-        name: View
-        title: '&View'
-        type: menu_item
-        items:
-          - item:
-              name:    view_lines
-              title:   View Lines
-              type:    Check
-              value:   True
-              tooltip: View all lines (example to filter items)
-          - item:
-              title: 'Item2'
 
   toolbar:
     - item:
         icon:    SP_DialogSaveButton
-        tooltip: Save
+        tooltip: Save drawing
         title:  ' &Save '
         action: event_save_file
     - item:
         title: 'Save As ...'
+        tooltip: Save drawing with other name
         action: event_save_file_as
     - item:
         is_separator: True
