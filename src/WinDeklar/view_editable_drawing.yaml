@@ -29,7 +29,11 @@ window:
         type: menu_item
         items:
           - item:
-              title: 'Item1'
+              name:    view_lines
+              title:   View Lines
+              type:    Check
+              value:   True
+              tooltip: View all lines (example to filter items)
           - item:
               title: 'Item2'
 

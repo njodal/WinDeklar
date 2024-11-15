@@ -382,13 +382,13 @@ class SceneItem(QGraphicsItemGroup):
         self.alpha = None
         self.width = 0.1
 
+        self.item_def     = item_def
         self.pen          = QPen()
         self.view         = view
         self.scale_factor = self.view.scale_factor  # keep the scale factor used in creation time
 
         super().__init__()
 
-        self.item_def = item_def
         self.update_state()
 
         # flags
@@ -475,8 +475,16 @@ class SceneItem(QGraphicsItemGroup):
     def update_properties(self, new_properties):
         # print('new properties: %s' % new_properties)
         self.item_def.update(new_properties)
-        self.update_state()  # sync internal state
-        self.set_pen()       # to reflect visual changes (like new color or alpha)
+        self.update_state()   # sync internal state
+        self.update_others()  # sync inside items (like borders in corridors)
+        self.set_pen()        # to reflect visual changes (like new color or alpha)
+
+    def update_others(self):
+        """
+        Updates other item depending on the main line (to be implemented in subtypes like corridor)
+        :return:
+        """
+        pass
 
     def get_editable_properties(self):
         properties = {prop_name: self.item_def.get(prop_name, None) for prop_name
@@ -545,7 +553,7 @@ class SceneLine(SceneItem):
         return d < self.contain_width()
 
     def contain_width(self):
-        return 10
+        return max(self.width, 10)  # if line is too thin increase width in order to be more selectable
 
     def p1(self):
         return self.line.line().p1()
@@ -586,13 +594,6 @@ class SceneLine(SceneItem):
         self.line.setLine(QLineF(p1, p2))
         self.update_others()
 
-    def update_others(self):
-        """
-        Updates other item depending on the main line (to be implemented in subtypes like corridor)
-        :return:
-        """
-        pass
-
     # handles
     def get_handles(self):
         handle_start      = ChangeEndPointHandle(self, True)     # enlarge start point
@@ -621,7 +622,6 @@ class SceneCorridor(SceneLine):
     """
     def __init__(self, item_def, view):
         super().__init__(item_def, view)
-        self.corridor_width = scale(item_def.get('corridor_width', 1.0), self.scale_factor)
         self.center_line    = QGraphicsLineItem(self.line.line())
         center_line_pen     = QPen()
         center_line_color   = QColor('black')
@@ -634,7 +634,6 @@ class SceneCorridor(SceneLine):
 
         self.border1 = QGraphicsLineItem()
         self.border2 = QGraphicsLineItem()
-
         self.update_borders()
         self.addToGroup(self.border1)
         self.addToGroup(self.border2)
@@ -642,12 +641,9 @@ class SceneCorridor(SceneLine):
     def set_pen(self):
         self.line.setPen(self.pen)
 
-    def contain_width(self):
-        return self.corridor_width
-
     def get_borders_lines(self):
         p1, p2  = pixel_points_to_point([self.p1(), self.p2()])
-        borders = parallel_segments(p1, p2, self.corridor_width/2)
+        borders = parallel_segments(p1, p2, self.width/2)
         lines   = [QLineF(point_to_pixel_point(start, 1.0), point_to_pixel_point(end, 1.0)) for [start, end] in borders]
         return lines
 
