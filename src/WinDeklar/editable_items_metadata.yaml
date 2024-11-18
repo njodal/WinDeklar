@@ -1,5 +1,11 @@
 version: 1.0
 
+general:
+  items_name: items
+  item_name:  item
+  back_color: yellow
+  back_alpha: 1
+
 items:
   - item:
       type: line
@@ -18,6 +24,8 @@ items:
       default:
         center: [ 0.0, 0.0 ]
         radius: 0.5
+        color:  blue
+        alpha:  1
 
   - item:
       type: rectangle
@@ -28,6 +36,8 @@ items:
         center: [ 0.0, 0.0 ]
         width:  1.0
         height: 1.0
+        color:  green
+        alpha:  1
 
   - item:
       type: corridor
@@ -38,7 +48,7 @@ items:
         start: [ -1.0, 0.0 ]
         end:   [ 1.0, 0.0 ]
         color: gray
-        alpha: 0.4
+        alpha: 3
         corridor_width: 0.2
         width: 0.2
 

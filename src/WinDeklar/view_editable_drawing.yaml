@@ -78,6 +78,7 @@ window:
                       subtype: editable
                       title:   Editable drawing
                       desc:    Editable drawing example
+                      metadata_file_name: editable_items_metadata.yaml   # file info on the kind of items to edit
                       x_axis:  {name: 'points'}
                       y_axis:  {name: 'output'}
                       view_size: [100, 50]

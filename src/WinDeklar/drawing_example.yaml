@@ -1,4 +1,10 @@
 version: 1.0
+
+general:
+    back_color: green
+    back_alpha: 1         # alpha goes from 0 (transparent) to 10 (solid)
+    size:       [-2, 2, -2, 4]
+
 items:
   - item:
       type:  corridor
@@ -23,6 +29,7 @@ items:
       type:   circle
       name:   first circle
       color:  blue
+      alpha:  1
       width:  0.01
       center: [0, 0]
       radius: 0.5

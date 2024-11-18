@@ -3,10 +3,9 @@
 import sys
 import time
 
-import WinDeklar.WindowForm as WinForm
+import WindowForm as WinForm
 import WinDeklar.QTAux as QTAux
-import WinDeklar.record as rc
-import WinDeklar.yaml_functions as ya
+import WinDeklar.yaml_functions as yf
 
 
 class ExampleHost(WinForm.HostModel):
@@ -17,13 +16,9 @@ class ExampleHost(WinForm.HostModel):
     def __init__(self, file_name, default_directory='/tmp', file_extension='yaml'):
         # keys (names used in the yaml definition file)
         self.view_lines_key = 'view_lines'
-        self.points_key = 'points'
-        self.axis_key   = 'show_axis'
-        self.type_key   = 'graph_type'
         self.action_key = 'action'
         self.width_key  = 'line_width'
         self.graph1_key = 'graph1'
-        self.graph2_key = 'graph2'
 
         # particular data
         self.figure    = None
@@ -61,14 +56,14 @@ class ExampleHost(WinForm.HostModel):
         :param ax:
         :return:
         """
-        if figure.name == self.graph1_key:
-            if self.figure is None:
-                # just load items the first time the figure appears
-                self.figure = figure  # assure not call again initialization
-                if self.file_name is not None:
-                    items_def = ya.get_yaml_file(self.file_name, directory=None)
-                    box_size  = None  # pb.PointsBox(-2, 2, -2, 2)
-                    self.figure.add_items(items_def, points_box=box_size)
+        if figure.name != self.graph1_key or self.figure is not None:
+            return
+
+        # just load items the first time the figure appears
+        self.figure = figure  # assure not call again initialization
+        if self.file_name is not None:
+            items_def = yf.get_yaml_file(self.file_name, directory=None)
+            self.figure.load_drawing(items_def)
 
     def redraw(self):
         """
@@ -143,7 +138,7 @@ class ExampleHost(WinForm.HostModel):
         :param progress_bar: use to give feedback about the opening process
         :return:
         """
-        file = ya.get_yaml_file(file_name, must_exist=True, verbose=True)
+        file = yf.get_yaml_file(file_name, must_exist=True, verbose=True)
         self.load_drawing(file)
         self.refresh()
 
@@ -160,10 +155,8 @@ class ExampleHost(WinForm.HostModel):
         if self.figure is None:
             return
 
-        record = rc.Record(file_name, dir=None, add_time_stamp=False)
-        record.write_ln('version: 1')  # just to avoid warnings with editing in pycharm
-        for item_def in self.figure.get_items():
-            record.write_group('item', item_def, level=0, is_array=True)
+        to_save = self.figure.get_drawing()
+        yf.save_yaml_file(to_save, file_name, directory=None)
         msg = '%s saved' % file_name
         self.show_status_bar_msg(msg)
 

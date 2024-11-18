@@ -2,16 +2,15 @@ import copy
 import math
 import functools
 
-import WinDeklar.QTAux as qt
-import WinDeklar.WindowForm as wf
+import QTAux as qt
+import WindowForm as wf
 import WinDeklar.yaml_functions as yf
 
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, QShortcut, \
-    QGraphicsOpacityEffect, QGraphicsItem, QGraphicsLineItem, QGraphicsItemGroup, \
-    QGraphicsRectItem, QUndoCommand, QGraphicsPixmapItem
+    QGraphicsItem, QGraphicsLineItem, QGraphicsItemGroup, QGraphicsRectItem, QUndoCommand, QGraphicsPixmapItem
 from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF
 from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence, QTransform, QBrush, QPixmap, QPainter
+from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence, QBrush, QPixmap, QPainter
 
 
 class EditableFigure(QGraphicsView):
@@ -30,7 +29,7 @@ class EditableFigure(QGraphicsView):
     prop_key    = 'property'
 
     def __init__(self, parent, config, multiple_selection=True, scale_factor=100,
-                 edit_panel_name='input_panel_template.yaml'):
+                 edit_panel_name='input_panel_template.yaml', default_metadata_name='editable_items_metadata.yaml'):
         """
         A figure that have items inside that can be editables (move, change size, etc)
         :param parent: main window
@@ -40,15 +39,28 @@ class EditableFigure(QGraphicsView):
         :param edit_panel_name: name of the template for edit panel configuration
         """
         super().__init__()
+        self.setResizeAnchor(QGraphicsView.NoAnchor)
+        self.setTransformationAnchor(QGraphicsView.NoAnchor)
+
+        self.drawing_def = {'version': 1, 'general': {'back_color': 'yellow', 'back_alpha': 0}}
+
         self.name   = config.get(self.name_key, 'no_name')
         self.parent = parent
 
-        self.metadata       = get_metadata(self.parent)
-        self.items_metadata = self.metadata.get(EditableFigure.items_key, [])
+        self.scale_factor = scale_factor
+        self.scale(1, -1)  # to point y-axis up, not down
+
+        metadata_name       = config.get('metadata_file_name', default_metadata_name)
+        self.metadata       = get_metadata(self.parent, default_name=metadata_name)
+        self.general        = self.metadata.get('general', {})
+        self.items_key      = self.general.get('items_name', EditableFigure.items_key)
+        self.item_key       = self.general.get('item_name', EditableFigure.item_key)
+        self.items_metadata = self.metadata.get(self.items_key, [])
         self.props_metadata = self.metadata.get(EditableFigure.props_key, [])
         self.edit_template  = yf.get_yaml_file(edit_panel_name, directory=None)
 
-        self.scene    = QGraphicsScene(self)
+        self.scene = QGraphicsScene(self)
+        self.set_scene_color(self.general)
         self.setScene(self.scene)
 
         # undo functionality
@@ -71,14 +83,40 @@ class EditableFigure(QGraphicsView):
         if multiple_selection:
             self.setDragMode(QGraphicsView.RubberBandDrag)
 
-        self.scale_factor = scale_factor
-        self.scale(1, -1)  # to point y-axis up, not down
-
         # zoom parameters
         self.zoom_factor  = 1.15
         self.min_zoom     = 0.1
         self.max_zoom     = 10.0
         self.current_zoom = 1.0
+
+    def load_drawing(self, drawing_def):
+        self.clear()
+        self.drawing_def = drawing_def
+        general_def = self.drawing_def.get('general', {})
+        self.set_scene_color(general_def)
+        size = general_def.get('size', None)
+        if size is not None:
+            width  = size[1] - size[0]
+            height = size[3] - size[2]
+            self.scale_factor = self.width()/width if width > height else self.height()/height
+
+        self.add_items(self.drawing_def, points_box=None)
+
+    def set_scene_color(self, definition, color_key='back_color', alpha_key='back_alpha'):
+        color = definition.get(color_key, None)
+        if color is None:
+            return
+        back = QColor(color)
+        back.setAlpha(int(definition.get(alpha_key, 0)*255/10))
+        self.scene.setBackgroundBrush(QBrush(back))
+
+    def get_drawing(self):
+        """
+        Returns the dictionary with the current state of the drawing
+        :return:
+        """
+        self.drawing_def[self.items_key] = [{self.item_key: item} for item in self.get_items()]
+        return self.drawing_def
 
     def get_items(self):
         return [item.serialize() for item in self.items() if isinstance(item, SceneItem)]
@@ -121,15 +159,15 @@ class EditableFigure(QGraphicsView):
         :param points_box: bounding box of all items :type PointsBox
         :return:
         """
-        if EditableFigure.items_key not in items_def:
-            msg = 'Invalid items definition format, group %s not present in %s' % (EditableFigure.items_key, items_def)
+        if self.items_key not in items_def:
+            msg = 'Invalid items definition format, group %s not present in %s' % (self.items_key, items_def)
             return [msg]
 
         if points_box is not None:
             self.scene.setSceneRect(rect_from_points_box(points_box))
 
         fails_msg = []
-        for item_def in items_def[EditableFigure.items_key]:
+        for item_def in items_def[self.items_key]:
             fail_msg = self.add_item(item_def)
             if fail_msg != '':
                 fails_msg.append(fail_msg)
@@ -137,7 +175,7 @@ class EditableFigure(QGraphicsView):
 
     def add_item_from_ui(self, item_type, position):
         """
-        Add an item from in a given position
+        Add an item of a given type in a given position
         :param item_type:
         :param position:
         :return:
@@ -385,7 +423,7 @@ class SceneItem(QGraphicsItemGroup):
         self.name  = ''
         self.type  = ''
         self.color = ''
-        self.alpha = None
+        self.alpha = 127
         self.width = 0.1
 
         self.item_def     = item_def
@@ -410,7 +448,7 @@ class SceneItem(QGraphicsItemGroup):
         self.name  = self.item_def.get(EditableFigure.name_key, '')
         self.type  = self.item_def.get(EditableFigure.type_key, '')
         self.color = self.item_def.get(EditableFigure.color_key, None)
-        self.alpha = self.item_def.get(EditableFigure.alpha_key, 5)
+        self.alpha = int(self.item_def.get(EditableFigure.alpha_key, 5)*255/10)
         self.width = scale(self.item_def.get(self.width_key, 0.01), self.scale_factor)
 
         tooltip = self.item_def.get(self.tooltip_key, self.name)
@@ -419,11 +457,6 @@ class SceneItem(QGraphicsItemGroup):
 
         self.set_color()
         self.set_border_width()
-
-        if self.alpha is not None:
-            opacity_effect = QGraphicsOpacityEffect()
-            opacity_effect.setOpacity(self.alpha/10)
-            self.setGraphicsEffect(opacity_effect)
 
     def set_pen(self):
         """
@@ -435,7 +468,9 @@ class SceneItem(QGraphicsItemGroup):
     def set_color(self):
         if self.color is None or self.color == '':
             return
-        self.pen.setColor(QColor(self.color))
+        color = QColor(self.color)
+        color.setAlpha(self.alpha)
+        self.pen.setColor(color)
 
     def set_border_width(self):
         self.pen.setCapStyle(Qt.FlatCap)
@@ -445,6 +480,11 @@ class SceneItem(QGraphicsItemGroup):
         new_def       = copy.deepcopy(self.serialize())
         new_item, msg = self.create(new_def, self.view)
         return new_item
+
+    def add_to_group(self, scene_item):
+        scene_rect = self.view.scene.sceneRect()
+        self.addToGroup(scene_item)
+        self.view.scene.setSceneRect(scene_rect)
 
     # handles
     def set_handles(self):
@@ -685,6 +725,8 @@ class SceneCircle(SceneItem):
         """
         Define a circle from a center point and radius
         """
+        self.circle = QGraphicsEllipseItem()
+
         super().__init__(item_def, view)
         center_point  = item_def[SceneItem.center_key]
         radius        = item_def[SceneItem.radius_key]
@@ -692,10 +734,20 @@ class SceneCircle(SceneItem):
         radius_pixels = scale(radius, self.scale_factor)
         self.circle   = get_circle(center_pixels, radius_pixels)
         self.set_pen()
-        self.addToGroup(self.circle)
+        self.add_to_group(self.circle)
 
     def set_pen(self):
+        self.set_color()
         self.circle.setPen(self.pen)
+
+    def set_color(self):
+        if self.circle is None or self.color is None or self.color == '':
+            return
+        color = QColor(self.color)
+        color.setAlpha(self.alpha)
+        brush = QBrush(color)
+        self.pen.setColor(color)
+        self.circle.setBrush(brush)
 
     def contains(self, point: QPointF):
         d = distance_in_pixels(self.center_pixel_point(), point)
@@ -706,8 +758,10 @@ class SceneCircle(SceneItem):
         Returns the circle's center in pixels
         :return:
         """
-        bounding_rect = self.circle.rect()
-        return bounding_rect.center()
+        corner       = self.circle.pos()
+        radius       = self.radius_pixels()
+        center_point = corner  + QPointF(radius, radius)
+        return center_point
 
     def radius_pixels(self):
         bounding_rect = self.circle.rect()
@@ -725,9 +779,13 @@ class SceneCircle(SceneItem):
 
     # update
     def translate(self, translation):
-        bounding_rect = self.circle.rect()
-        self.circle.setRect(bounding_rect.x() + translation.x(), bounding_rect.y() + translation.y(),
-                            bounding_rect.width(), bounding_rect.height())
+        """
+        Translate circle
+        :param translation:
+        :return:
+        """
+        new_pos = self.circle.pos() + translation
+        self.circle.setPos(new_pos)
 
     def update_size(self, new_radius):
         """
@@ -735,9 +793,7 @@ class SceneCircle(SceneItem):
         :param new_radius:
         :return:
         """
-        # print(center, new_position, new_radius)
-        center = self.center_pixel_point()
-        self.circle.setRect(center.x() - new_radius, center.y() - new_radius, new_radius*2, new_radius*2)
+        self.circle.setRect(0, 0, new_radius*2, new_radius*2)
 
     # handles
     def get_handles(self):
@@ -780,7 +836,7 @@ class SceneRectangle(SceneItem):
 
     def set_rectangle(self):
         """
-        Returns the rectangle from its definition
+        Change rectangle properties (width, height, etc)
         :return:
         """
         center_point  = self.item_def[SceneItem.center_key]
@@ -795,8 +851,11 @@ class SceneRectangle(SceneItem):
     def set_color(self):
         if self.rectangle is None or self.color is None or self.color == '':
             return
-        brush = QBrush(QColor(self.color))
+        color = QColor(self.color)
+        color.setAlpha(self.alpha)
+        brush = QBrush(color)
         self.rectangle.setBrush(brush)
+        self.pen.setColor(color)
 
     def set_border_width(self):
         self.pen.setWidth(self.border_width)
@@ -997,9 +1056,10 @@ class Handle(QGraphicsItemGroup):
             svg_renderer.render(painter)
             painter.end()
 
-            # pixmap         = QPixmap(icon_name).scaled(size, size)
             self.icon_item = QGraphicsPixmapItem(pixmap)
+            scene_rect = self.parent_item.view.scene.sceneRect()
             self.addToGroup(self.icon_item)
+            self.parent_item.view.scene.setSceneRect(scene_rect)
         else:
             self.icon_item = None
 
@@ -1007,7 +1067,6 @@ class Handle(QGraphicsItemGroup):
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)  # to send itemChange
         # self.setParentItem(self.parent_item)
         self.parent_item.scene().addItem(self)
-
         self.move_to_parent()
 
     def move_to_parent(self):
@@ -1017,8 +1076,9 @@ class Handle(QGraphicsItemGroup):
         """
         pos, rotation = self.get_pos_and_rotation()
         self.icon_item.setPos(pos - self.icon_translate)
-        self.icon_item.setTransformOriginPoint(self.icon_item.boundingRect().center())
-        self.icon_item.setRotation(rotation)
+        if rotation != 0:
+            self.icon_item.setTransformOriginPoint(self.icon_item.boundingRect().center())
+            self.icon_item.setRotation(rotation)
 
     def get_pos_and_rotation(self):
         """
@@ -1112,7 +1172,6 @@ class ChangeSizeHandle(Handle):
         :param new_position: note that new_position is relative to parent
         :return:
         """
-        # self.circle.setPos(self.circle.pos() + new_position)
         center   = self.parent_item.center_pixel_point()
         new_size = distance_in_pixels(center, self.icon_item.pos() + new_position)
         command  = ChangeSizeCommand(self.parent_item, new_size)
@@ -1200,6 +1259,7 @@ def get_metadata(parent, file_key='metadata_file_name', default_name='editable_i
     :param parent:
     :return: :type dict
     """
+    # if parent provides a metadata name use it, else use the default one
     file_name = getattr(parent, file_key) if hasattr(parent, file_key) else None
     if file_name is None:
         file_name = default_name
@@ -1234,7 +1294,10 @@ def get_circle(center_point, radius):
     y = center_point.y() - radius
     width  = radius*2
     height = width
-    return QGraphicsEllipseItem(x, y, width, height)
+    circle = QGraphicsEllipseItem(0, 0, width, height)
+    circle.setPos(QPointF(x, y))
+    # print(circle.pos(), circle.boundingRect())
+    return circle
 
 
 def set_rectangle(rectangle: QGraphicsRectItem, center: QPointF, width, height, rotation):
