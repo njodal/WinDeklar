@@ -1,43 +1,71 @@
-version: 1.0
-
 general:
-    back_color: green
-    back_alpha: 1         # alpha goes from 0 (transparent) to 10 (solid)
-    size:       [-2, 2, -2, 4]
-
+  back_alpha: 2
+  back_color: yellow
+  # scale_factor: 50
+  size:
+  - -2.5
+  - 3.5
+  - -3
+  - 4
 items:
-  - item:
-      type:  corridor
-      name:  corridor one
-      color: gray
-      alpha: 5
-      start: [-2.0, -1.0]
-      end:   [2.0, -1.0]
-      width: 0.2
-      show_borders: True
-  - item:
-      type:  rectangle
-      name:  rectangle one
-      color: green
-      alpha: 2
-      center: [-1, 0]
-      width:  1
-      height: 2
-      rotation: 45.0
-      show_borders: False
-  - item:
-      type:   circle
-      name:   first circle
-      color:  blue
-      alpha:  1
-      width:  0.01
-      center: [0, 0]
-      radius: 0.5
-  - item:
-      type:  line
-      name:  first line
-      color: red
-      alpha: 2
-      width: 0.1
-      start: [0.0, 0.0]
-      end:   [1.0, 2.0]
+- item:
+    alpha: 3
+    color: gray
+    corridor_width: 0.2
+    end:
+    - -1.65955615194164
+    - -2.299997833438602
+    name: ' Second Street'
+    start:
+    - -1.6625
+    - -0.3
+    type: corridor
+    width: 0.2
+- item:
+    alpha: 2
+    color: red
+    end:
+    - 2.5625
+    - -0.3375
+    name: Wall One
+    start:
+    - 2.559594089042853
+    - -1.9334908734643306
+    type: line
+    width: 0.1
+- item:
+    alpha: 1
+    center:
+    - -1.351026046611942
+    - -0.726026046611942
+    color: blue
+    name: Column One
+    radius: 0.11147395338805799
+    type: circle
+    width: 0.01
+- item:
+    alpha: 2
+    center:
+    - -0.48750000000000143
+    - -1.6500000000000015
+    color: green
+    height: 2.0
+    name: Building One
+    rotation: 90.0
+    show_borders: false
+    type: rectangle
+    width: 1.0
+- item:
+    alpha: 3.0
+    color: gray
+    end:
+    - 2.0
+    - -1.0
+    name: Main Street
+    show_borders: false
+    start:
+    - -2.0
+    - -1.0
+    type: corridor
+    width: 0.2
+version: 1.0

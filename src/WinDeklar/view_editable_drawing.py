@@ -16,6 +16,7 @@ class ExampleHost(WinForm.HostModel):
     def __init__(self, file_name, default_directory='/tmp', file_extension='yaml'):
         # keys (names used in the yaml definition file)
         self.view_lines_key = 'view_lines'
+        self.show_grid_key  = 'show_grid'
         self.action_key = 'action'
         self.width_key  = 'line_width'
         self.graph1_key = 'graph1'
@@ -45,6 +46,10 @@ class ExampleHost(WinForm.HostModel):
             if self.figure is None:
                 return
             self.figure.set_visible_type('line', value)
+        if name == self.show_grid_key:
+            if self.figure is None:
+                return
+            self.figure.show_grid(value)
 
     def update_view(self, figure, ax):
         """

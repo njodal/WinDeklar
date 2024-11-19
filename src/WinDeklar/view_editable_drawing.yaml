@@ -66,6 +66,12 @@ window:
                       type:    Check
                       value:   True
                       tooltip: View all lines (example to filter items)
+                  - widget:
+                      name:    show_grid
+                      title:   Show Grid
+                      type:    Check
+                      value:   False
+                      tooltip: Display grid lines for reference
 
             - item:
                 name:    figures

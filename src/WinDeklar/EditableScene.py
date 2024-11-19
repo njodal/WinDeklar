@@ -27,6 +27,7 @@ class EditableFigure(QGraphicsView):
     size_key    = 'size'
     props_key   = 'properties'
     prop_key    = 'property'
+    scale_key   = 'scale_factor'
 
     def __init__(self, parent, config, multiple_selection=True, scale_factor=100,
                  edit_panel_name='input_panel_template.yaml', default_metadata_name='editable_items_metadata.yaml'):
@@ -60,8 +61,15 @@ class EditableFigure(QGraphicsView):
         self.edit_template  = yf.get_yaml_file(edit_panel_name, directory=None)
 
         self.scene = QGraphicsScene(self)
-        self.set_scene_color(self.general)
         self.setScene(self.scene)
+        self.back_rectangle = None
+
+        # grid
+        self.grid_group      = None
+        self.grid_size       = 1.0    # distance between lines in grid in external units
+        self.grid_is_visible = False
+        self.grid_opacity    = 0.5
+        self.grid_color      = 'lightgray'
 
         # undo functionality
         self.undo_stack = QUndoStack()
@@ -89,26 +97,33 @@ class EditableFigure(QGraphicsView):
         self.max_zoom     = 10.0
         self.current_zoom = 1.0
 
-    def load_drawing(self, drawing_def):
+    def load_drawing(self, drawing_def, color_key='back_color', alpha_key='back_alpha'):
         self.clear()
-        self.drawing_def = drawing_def
-        general_def = self.drawing_def.get('general', {})
-        self.set_scene_color(general_def)
-        size = general_def.get('size', None)
-        if size is not None:
+        self.delete_grid()
+        self.drawing_def  = drawing_def
+        general_def       = self.drawing_def.get('general', {})
+        self.grid_size    = general_def.get('grid_size', 1.0)
+        back_color        = get_color_from_dict(general_def, color_key=color_key, alpha_key=alpha_key)
+        self.scale_factor = general_def.get(self.scale_key, self.scale_factor)
+        size              = general_def.get('size', None)
+        if size is None:
+            # if size is not defined paint the whole scene with the back_color
+            if back_color is not None:
+                self.scene.setBackgroundBrush(QBrush(back_color))
+        else:
             width  = size[1] - size[0]
             height = size[3] - size[2]
-            self.scale_factor = self.width()/width if width > height else self.height()/height
+            if self.scale_key not in general_def:
+                # define the scale factor depending on the draw size
+                self.scale_factor = self.width()/width if width > height else self.height()/height
+                self.scale_factor *= 0.75
+            print('size', width, height, self.height(), self.scale_factor)
+            self.back_rectangle = get_rectangle(size, back_color, self.scale_factor)
+            self.scene.addItem(self.back_rectangle)
 
         self.add_items(self.drawing_def, points_box=None)
-
-    def set_scene_color(self, definition, color_key='back_color', alpha_key='back_alpha'):
-        color = definition.get(color_key, None)
-        if color is None:
-            return
-        back = QColor(color)
-        back.setAlpha(int(definition.get(alpha_key, 0)*255/10))
-        self.scene.setBackgroundBrush(QBrush(back))
+        # Fit scene in view
+        # self.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
 
     def get_drawing(self):
         """
@@ -126,6 +141,7 @@ class EditableFigure(QGraphicsView):
 
     def get_item_in_position(self, pos_in_view):
         pos_in_scene = self.get_pos_in_scene(pos_in_view)
+        print('position: %s' % pixel_point_to_point(pos_in_scene, self.scale_factor, QPointF(0, 0)))
         for item1 in self.scene.items():
             item = item1.group()
             if item is None:
@@ -236,6 +252,61 @@ class EditableFigure(QGraphicsView):
         """
         translate = QPointF(0, 0)
         return pixel_point_to_point(self.mapToScene(event_pos), self.scale_factor, translate)
+
+    # grid management
+    def show_grid(self, is_visible):
+        if is_visible:
+            self.add_grid()
+        else:
+            self.delete_grid()
+
+    def add_grid(self):
+        """Add grid lines for reference"""
+        self.delete_grid()
+
+        rect = self.back_rectangle.rect() if self.back_rectangle is not None else self.sceneRect()
+
+        grid_size_pixels = int(self.grid_size*self.scale_factor)
+
+        # Create a group for all grid lines
+        self.grid_group = QGraphicsItemGroup()
+        self.grid_group.setOpacity(self.grid_opacity)
+
+        pen = QPen(QColor(self.grid_color))
+        pen.setCosmetic(True)  # Line width won't change with zoom
+
+        # Calculate and create all lines
+        x_start = int(int(rect.left()) - int(rect.left()) % grid_size_pixels)
+        y_start = int(int(rect.top()) - (int(rect.top()) % grid_size_pixels))
+
+        # Create vertical lines
+        for x in range(x_start, int(rect.right()), grid_size_pixels):
+            line = QGraphicsLineItem(QLineF(x, rect.top(), x, rect.bottom()))
+            line.setPen(pen)
+            self.grid_group.addToGroup(line)
+
+        # Create horizontal lines
+        for y in range(y_start, int(rect.bottom()), grid_size_pixels):
+            line = QGraphicsLineItem(QLineF(rect.left(), y, rect.right(), y))
+            line.setPen(pen)
+            self.grid_group.addToGroup(line)
+
+        # Add the group to the scene
+        if self.back_rectangle:
+            self.grid_group.setPos(self.back_rectangle.pos())
+        self.scene.addItem(self.grid_group)
+        self.grid_is_visible = True
+
+        # Ensure grid stays in background
+        self.grid_group.setZValue(-1000)
+
+    def delete_grid(self):
+        """Remove all grid lines"""
+        if self.grid_group is None:
+            return
+        self.scene.removeItem(self.grid_group)
+        self.grid_group      = None
+        self.grid_is_visible = False
 
     # undo
     def undo(self):
@@ -422,8 +493,6 @@ class SceneItem(QGraphicsItemGroup):
         # to avoid warnings
         self.name  = ''
         self.type  = ''
-        self.color = ''
-        self.alpha = 127
         self.width = 0.1
 
         self.item_def     = item_def
@@ -447,8 +516,6 @@ class SceneItem(QGraphicsItemGroup):
     def update_state(self):
         self.name  = self.item_def.get(EditableFigure.name_key, '')
         self.type  = self.item_def.get(EditableFigure.type_key, '')
-        self.color = self.item_def.get(EditableFigure.color_key, None)
-        self.alpha = int(self.item_def.get(EditableFigure.alpha_key, 5)*255/10)
         self.width = scale(self.item_def.get(self.width_key, 0.01), self.scale_factor)
 
         tooltip = self.item_def.get(self.tooltip_key, self.name)
@@ -466,10 +533,9 @@ class SceneItem(QGraphicsItemGroup):
         pass
 
     def set_color(self):
-        if self.color is None or self.color == '':
+        color = get_color_from_dict(self.item_def)
+        if color is None:
             return
-        color = QColor(self.color)
-        color.setAlpha(self.alpha)
         self.pen.setColor(color)
 
     def set_border_width(self):
@@ -596,7 +662,7 @@ class SceneLine(SceneItem):
         original_line      = QLineF(start_point_pixels, end_point_pixels)
         self.line          = QGraphicsLineItem(original_line)
         self.set_pen()
-        self.addToGroup(self.line)
+        self.add_to_group(self.line)
 
     def set_pen(self):
         self.line.setPen(self.pen)
@@ -683,13 +749,14 @@ class SceneCorridor(SceneLine):
         center_line_pen.setStyle(Qt.DashLine)
         center_line_pen.setWidth(1)
         self.center_line.setPen(center_line_pen)
+        self.add_to_group(self.center_line)
         self.addToGroup(self.center_line)
 
         self.border1 = QGraphicsLineItem()
         self.border2 = QGraphicsLineItem()
         self.update_borders()
-        self.addToGroup(self.border1)
-        self.addToGroup(self.border2)
+        self.add_to_group(self.border1)
+        self.add_to_group(self.border2)
 
     def set_pen(self):
         self.line.setPen(self.pen)
@@ -741,10 +808,11 @@ class SceneCircle(SceneItem):
         self.circle.setPen(self.pen)
 
     def set_color(self):
-        if self.circle is None or self.color is None or self.color == '':
+        if self.circle is None:
             return
-        color = QColor(self.color)
-        color.setAlpha(self.alpha)
+        color = get_color_from_dict(self.item_def)
+        if color is None:
+            return
         brush = QBrush(color)
         self.pen.setColor(color)
         self.circle.setBrush(brush)
@@ -826,7 +894,7 @@ class SceneRectangle(SceneItem):
 
         self.set_rectangle()
         self.set_pen()
-        self.addToGroup(self.rectangle)
+        self.add_to_group(self.rectangle)
 
     def get_rect_params_in_pixels(self):
         rotation      = self.item_def.get(SceneItem.rotation_key, 0)
@@ -849,10 +917,11 @@ class SceneRectangle(SceneItem):
         self.rectangle.setPen(self.pen)
 
     def set_color(self):
-        if self.rectangle is None or self.color is None or self.color == '':
+        if self.rectangle is None:
             return
-        color = QColor(self.color)
-        color.setAlpha(self.alpha)
+        color = get_color_from_dict(self.item_def)
+        if color is None:
+            return
         brush = QBrush(color)
         self.rectangle.setBrush(brush)
         self.pen.setColor(color)
@@ -1046,7 +1115,7 @@ class Handle(QGraphicsItemGroup):
         super().__init__()
         self.parent_item    = parent_item
         self.size           = size
-        self.icon_translate = QPointF(self.size/2, self.size/2)
+        self.icon_translate = QPointF(self.size/2, -self.size/2)
         # self.icon_translate = QPointF(0, 0)
         if icon_name is not None:
             pixmap = QPixmap(self.size, self.size)
@@ -1057,6 +1126,7 @@ class Handle(QGraphicsItemGroup):
             painter.end()
 
             self.icon_item = QGraphicsPixmapItem(pixmap)
+            self.icon_item.setFlag(QGraphicsPixmapItem.ItemIgnoresTransformations)  # to ignore zoom
             scene_rect = self.parent_item.view.scene.sceneRect()
             self.addToGroup(self.icon_item)
             self.parent_item.view.scene.setSceneRect(scene_rect)
@@ -1283,6 +1353,15 @@ def check_must_have_properties(item_def, metadata, req_key='required_properties'
     return ''  # all required properties are presents
 
 
+def get_color_from_dict(definition, color_key='color', alpha_key='alpha'):
+    color_name = definition.get(color_key, None)
+    if color_name is None:
+        return None
+    color = QColor(color_name)
+    color.setAlpha(int(definition.get(alpha_key, 0)*255/10))
+    return color
+
+
 def get_circle(center_point, radius):
     """
     Returns a circle
@@ -1296,8 +1375,37 @@ def get_circle(center_point, radius):
     height = width
     circle = QGraphicsEllipseItem(0, 0, width, height)
     circle.setPos(QPointF(x, y))
-    # print(circle.pos(), circle.boundingRect())
+    # print('circle', circle.pos(), circle.boundingRect())
     return circle
+
+
+def get_rectangle(size, back_color, scale_factor, is_movable=False, is_selectable=False):
+    """
+    Create a rectangle in a given position with a given size
+    :param scale_factor:
+    :param is_selectable:
+    :param is_movable:
+    :param size:
+    :param back_color:
+    :return:
+    """
+    size_pixels = [scale(d, scale_factor) for d in size]
+    width  = size_pixels[1] - size_pixels[0]
+    height = size_pixels[3] - size_pixels[2]
+    rect   = QGraphicsRectItem(0, 0, width, height)
+    pos    = QPointF(size_pixels[0], size_pixels[2])
+    # print('back pos', pos, size_pixels, width, height, size_pixels)
+    rect.setPos(pos)
+
+    if back_color is not None:
+        brush = QBrush(back_color)
+        rect.setBrush(brush)
+    rect.setPen(QPen(Qt.NoPen))
+
+    # Make it non-movable and non-selectable
+    rect.setFlag(QGraphicsRectItem.ItemIsMovable, is_movable)
+    rect.setFlag(QGraphicsRectItem.ItemIsSelectable, is_selectable)
+    return rect
 
 
 def set_rectangle(rectangle: QGraphicsRectItem, center: QPointF, width, height, rotation):
