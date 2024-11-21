@@ -2,13 +2,13 @@ import copy
 import math
 import functools
 
-import QTAux as qt
-import WindowForm as wf
+import WinDeklar.QTAux as qt
+import WinDeklar.WindowForm as wf
 import WinDeklar.yaml_functions as yf
 
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, QShortcut, \
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QUndoStack, QShortcut, QLabel, \
     QGraphicsItem, QGraphicsLineItem, QGraphicsItemGroup, QGraphicsRectItem, QUndoCommand, QGraphicsPixmapItem
-from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF
+from PyQt5.QtCore import QRectF, Qt, QPointF, QLineF, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtGui import QPen, QColor, QPolygonF, QKeySequence, QBrush, QPixmap, QPainter
 
@@ -28,8 +28,11 @@ class EditableFigure(QGraphicsView):
     props_key   = 'properties'
     prop_key    = 'property'
     scale_key   = 'scale_factor'
+    general_key = 'general'
+    back_color_key = 'back_color'
+    back_alpha_key = 'back_alpha'
 
-    def __init__(self, parent, config, multiple_selection=True, scale_factor=100,
+    def __init__(self, parent, config, multiple_selection=True, scale_factor=100, back_color='white', back_alpha=0,
                  edit_panel_name='input_panel_template.yaml', default_metadata_name='editable_items_metadata.yaml'):
         """
         A figure that have items inside that can be editables (move, change size, etc)
@@ -43,7 +46,9 @@ class EditableFigure(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.NoAnchor)
         self.setTransformationAnchor(QGraphicsView.NoAnchor)
 
-        self.drawing_def = {'version': 1, 'general': {'back_color': 'yellow', 'back_alpha': 0}}
+        # default drawing def
+        self.drawing_def = {'version': 1, self.general_key: {self.back_color_key: back_color,
+                                                             self.back_alpha_key: back_alpha}}
 
         self.name   = config.get(self.name_key, 'no_name')
         self.parent = parent
@@ -51,9 +56,10 @@ class EditableFigure(QGraphicsView):
         self.scale_factor = scale_factor
         self.scale(1, -1)  # to point y-axis up, not down
 
+        # metadata
         metadata_name       = config.get('metadata_file_name', default_metadata_name)
         self.metadata       = get_metadata(self.parent, default_name=metadata_name)
-        self.general        = self.metadata.get('general', {})
+        self.general        = self.metadata.get(self.general_key, {})
         self.items_key      = self.general.get('items_name', EditableFigure.items_key)
         self.item_key       = self.general.get('item_name', EditableFigure.item_key)
         self.items_metadata = self.metadata.get(self.items_key, [])
@@ -63,6 +69,10 @@ class EditableFigure(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.back_rectangle = None
+        back_color = get_color_from_dict(self.drawing_def[self.general_key], color_key=self.back_color_key,
+                                         alpha_key=self.back_alpha_key)
+        if back_color is not None:
+            self.scene.setBackgroundBrush(QBrush(back_color))
 
         # grid
         self.grid_group      = None
@@ -96,16 +106,19 @@ class EditableFigure(QGraphicsView):
         self.min_zoom     = 0.1
         self.max_zoom     = 10.0
         self.current_zoom = 1.0
+        self.zoom_label   = FadeLabel(self)
+        self.zoom_label.hide()  # Initially hidden
 
-    def load_drawing(self, drawing_def, color_key='back_color', alpha_key='back_alpha'):
+    def load_drawing(self, drawing_def):
         self.clear()
         self.delete_grid()
         self.drawing_def  = drawing_def
-        general_def       = self.drawing_def.get('general', {})
+        general_def       = self.drawing_def.get(self.general_key, {})
         self.grid_size    = general_def.get('grid_size', 1.0)
-        back_color        = get_color_from_dict(general_def, color_key=color_key, alpha_key=alpha_key)
+        back_color        = get_color_from_dict(general_def, color_key=self.back_color_key,
+                                                alpha_key=self.back_alpha_key)
         self.scale_factor = general_def.get(self.scale_key, self.scale_factor)
-        size              = general_def.get('size', None)
+        size              = general_def.get(self.size_key, None)
         if size is None:
             # if size is not defined paint the whole scene with the back_color
             if back_color is not None:
@@ -117,13 +130,24 @@ class EditableFigure(QGraphicsView):
                 # define the scale factor depending on the draw size
                 self.scale_factor = self.width()/width if width > height else self.height()/height
                 self.scale_factor *= 0.75
-            print('size', width, height, self.height(), self.scale_factor)
+            # print('size', width, height, self.height(), self.scale_factor)
             self.back_rectangle = get_rectangle(size, back_color, self.scale_factor)
             self.scene.addItem(self.back_rectangle)
 
         self.add_items(self.drawing_def, points_box=None)
         # Fit scene in view
         # self.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+
+    def set_back_color(self):
+        general_def = self.drawing_def.get(self.general_key, {})
+        back_color  = get_color_from_dict(general_def, color_key=self.back_color_key, alpha_key=self.back_alpha_key)
+        if back_color is None:
+            return
+        brush = QBrush(back_color)
+        if self.back_rectangle is None:
+            self.scene.setBackgroundBrush(brush)
+        else:
+            self.back_rectangle.setBrush(brush)
 
     def get_drawing(self):
         """
@@ -363,11 +387,14 @@ class EditableFigure(QGraphicsView):
         :return:
         """
         if event.angleDelta().y() > 0:
-            # Zoom in
             self.zoom_in()
         else:
-            # Zoom out
             self.zoom_out()
+        self.update_zoom_label()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_zoom_label()
 
     def contextMenuEvent(self, event):
         """
@@ -404,6 +431,10 @@ class EditableFigure(QGraphicsView):
             actions.append(['Delete %s' % type_and_name,
                             functools.partial(self.delete_item_from_ui, item_in_position)])
 
+        # Draw properties
+        actions.append(['Separator', None])
+        actions.append(['Drawing properties ...', functools.partial(self.edit_general)])
+
         context_menu = qt.Menu(self, actions=actions)
         context_menu.popup()
 
@@ -421,17 +452,63 @@ class EditableFigure(QGraphicsView):
 
     # zoom
     def zoom_in(self):
-        if self.current_zoom * self.zoom_factor < self.max_zoom:
-            self.scale(self.zoom_factor, self.zoom_factor)
-            self.current_zoom *= self.zoom_factor
+        new_zoom = self.current_zoom * self.zoom_factor
+        if new_zoom > self.max_zoom:
+            # do nothing
+            return
+        self.scale(self.zoom_factor, self.zoom_factor)
+        self.current_zoom = new_zoom
 
     def zoom_out(self):
-        if self.current_zoom / self.zoom_factor > self.min_zoom:
-            self.scale(1 / self.zoom_factor, 1 / self.zoom_factor)
-            self.current_zoom /= self.zoom_factor
+        new_zoom = self.current_zoom / self.zoom_factor
+        if new_zoom < self.min_zoom:
+            # do nothing
+            return
+        self.scale(1 / self.zoom_factor, 1 / self.zoom_factor)
+        self.current_zoom = new_zoom
+
+    def update_zoom_label(self):
+        """
+        Update zoom label text and position
+        :return:
+        """
+        zoom_percentage = self.current_zoom * 100
+        self.zoom_label.setText(f"Zoom: {zoom_percentage:.0f}%")
+
+        # Position label in top-right corner
+        self.zoom_label.adjustSize()
+        label_x = self.width() - self.zoom_label.width() - 10
+        self.zoom_label.move(label_x, 10)
+
+        self.zoom_label.show_with_fade()
+
+    # edit
+    def edit_general(self):
+        """
+        Displays a dialog to edit the properties of the general section
+        :return:
+        """
+        general             = self.drawing_def.get(self.general_key, {})
+        dialog_full_name    = None  # dialog is built on the fly, do not use external definition
+        editable_properties = {prop_name: general.get(prop_name, '') for prop_name in
+                               ['description', 'back_color', 'back_alpha']}
+        dialog_config       = self.get_edit_dialog_config(editable_properties)
+        properties_window   = wf.PropertiesHost(dialog_full_name, editable_properties, dialog_config=dialog_config)
+        changed             = properties_window.show()
+        command             = ChangeDictPropertiesCommand(general, changed, self.update_scene)
+        self.add_ui_command(command)
+
+    def get_edit_dialog_config(self, editable_properties):
+        """
+        Returns the Dialog config for a set of editable properties
+        :param editable_properties: list with the property name
+        :return:
+        """
+        return get_edit_dialog_config(editable_properties, self.props_metadata, self.edit_template)
 
     # update figure
     def update_scene(self):
+        self.set_back_color()
         self.update()
 
     def update_figure(self):
@@ -578,10 +655,10 @@ class SceneItem(QGraphicsItemGroup):
         """
         dialog_full_name    = None  # dialog is built on the fly, do not use external definition
         editable_properties = self.get_editable_properties()
-        dialog_config       = self.get_edit_dialog_config(editable_properties)
+        dialog_config       = self.view.get_edit_dialog_config(editable_properties)
         properties_window   = wf.PropertiesHost(dialog_full_name, editable_properties, dialog_config=dialog_config)
         changed             = properties_window.show()
-        command             = ChangePropertiesCommand(self, changed)
+        command             = ChangeItemPropertiesCommand(self, changed)
         self.view.add_ui_command(command)
 
     def update_properties(self, new_properties):
@@ -602,27 +679,6 @@ class SceneItem(QGraphicsItemGroup):
         properties = {prop_name: self.item_def.get(prop_name, None) for prop_name
                       in self.view.get_metadata_for_type(self.type).get('editable_properties', [])}
         return properties
-
-    def get_edit_dialog_config(self, editable_properties, widget_height=50, buttons_height=100):
-        dialog_config = self.view.edit_template.copy()
-        # add specific properties
-        it_key   = EditableFigure.item_key
-        win_key  = EditableFigure.window_key
-        lay_key  = EditableFigure.layout_key
-        size_key = EditableFigure.size_key
-        widgets  = dialog_config[win_key][lay_key][0][it_key][lay_key][0][it_key][EditableFigure.widgets_key]
-        widgets.clear()
-        for k in editable_properties:
-            for p1 in self.view.props_metadata:
-                p = p1[EditableFigure.prop_key]
-                if k == p[EditableFigure.name_key]:
-                    widget_def = {EditableFigure.widget_key: p}
-                    widgets.append(widget_def)
-
-        # dynamically adjust height so all controls fit
-        dialog_config[win_key][size_key][3] = widget_height*len(widgets) + buttons_height
-
-        return dialog_config
 
     # events
     def hoverEnterEvent(self, event):
@@ -1092,7 +1148,32 @@ class ChangeSizeCommand(QUndoCommand):
         self.item.update_size(-self.new_size)
 
 
-class ChangePropertiesCommand(QUndoCommand):
+class ChangeDictPropertiesCommand(QUndoCommand):
+    """
+    Changes the properties of a given Dictionary
+    """
+
+    def __init__(self, dictionary, changed_properties, update_function, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dictionary      = dictionary
+        self.update_function = update_function
+        self.new_properties  = changed_properties
+        self.old_properties  = self.dictionary.copy()
+
+    def redo(self):
+        self.dictionary.update(self.new_properties)
+        self.update_function()
+
+    def undo(self):
+        self.dictionary = self.old_properties
+        self.update_function()
+
+
+class ChangeItemPropertiesCommand(QUndoCommand):
+    """
+    Changes the properties of a given SceneItem
+    """
+
     def __init__(self, item, changed_properties, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.item           = item
@@ -1126,7 +1207,7 @@ class Handle(QGraphicsItemGroup):
             painter.end()
 
             self.icon_item = QGraphicsPixmapItem(pixmap)
-            self.icon_item.setFlag(QGraphicsPixmapItem.ItemIgnoresTransformations)  # to ignore zoom
+            self.icon_item.setFlag(QGraphicsPixmapItem.ItemIgnoresTransformations)  # to ignore changes on zoom
             scene_rect = self.parent_item.view.scene.sceneRect()
             self.addToGroup(self.icon_item)
             self.parent_item.view.scene.setSceneRect(scene_rect)
@@ -1308,6 +1389,92 @@ class RotateHandle(Handle):
 
     def non_selected_end_point(self):
         return self.parent_item.p2() if self.is_start else self.parent_item.p1()
+
+
+class FadeLabel(QLabel):
+    """
+    Custom label with fade effect
+    """
+
+    def __init__(self, parent=None, fade_time=1000):
+        super().__init__(parent)
+
+        # Setup appearance
+        self.setAlignment(Qt.AlignCenter)
+        self.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 150);
+                color: white;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-size: 13px;
+            }
+        """)
+
+        # Initialize fade animation
+        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_animation.setDuration(fade_time)  # fade time in ms
+        self.fade_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+        # Setup timer for auto-hide
+        self.hide_timer = QTimer(self)
+        self.hide_timer.setSingleShot(True)
+        self.hide_timer.timeout.connect(self.start_fade_out)
+
+    def show_with_fade(self):
+        """Show label with fade in effect"""
+        # Stop any running animations/timers
+        self.fade_animation.stop()
+        self.hide_timer.stop()
+
+        # Setup and start fade in
+        self.fade_animation.setStartValue(0.0)
+        self.fade_animation.setEndValue(1.0)
+        self.show()
+        self.fade_animation.start()
+
+        # Start timer to hide
+        self.hide_timer.start(1500)  # Hide after 1.5 seconds
+
+    def start_fade_out(self):
+        """Start fade out animation"""
+        self.fade_animation.setStartValue(1.0)
+        self.fade_animation.setEndValue(0.0)
+        self.fade_animation.finished.connect(self.hide)
+        self.fade_animation.start()
+
+
+# functions
+def get_edit_dialog_config(editable_properties, properties_metadata, edit_template, widget_height=50,
+                           buttons_height=100):
+    """
+    Returns the Dialog config for a set of editable properties
+    :param edit_template:       template with the Dialog layout
+    :param editable_properties: properties to be edited in the form
+    :param properties_metadata: metadata about the properties to edit
+    :param widget_height:
+    :param buttons_height:
+    :return:
+    """
+    dialog_config = edit_template.copy()
+    # add specific properties
+    it_key   = EditableFigure.item_key
+    win_key  = EditableFigure.window_key
+    lay_key  = EditableFigure.layout_key
+    size_key = EditableFigure.size_key
+    widgets  = dialog_config[win_key][lay_key][0][it_key][lay_key][0][it_key][EditableFigure.widgets_key]
+    widgets.clear()
+    for k in editable_properties:
+        for p1 in properties_metadata:
+            p = p1[EditableFigure.prop_key]
+            if k == p[EditableFigure.name_key]:
+                widget_def = {EditableFigure.widget_key: p}
+                widgets.append(widget_def)
+
+    # dynamically adjust height so all controls fit
+    dialog_config[win_key][size_key][3] = widget_height*len(widgets) + buttons_height
+
+    return dialog_config
 
 
 def edit_item_from_ui(item_in_position):

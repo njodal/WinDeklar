@@ -86,6 +86,16 @@ properties:
       parms: [0, 10, 1]      # [min_value, max_value, scale]
       value: 5
   - property:
+      name:  back_color
+      title: Back Color
+      type:  EditText
+  - property:
+      name:  back_alpha
+      title: Back Alpha
+      type:  Slider
+      parms: [0, 10, 1]      # [min_value, max_value, scale]
+      value: 5
+  - property:
       name:  rotation
       title: Rotation
       type:  Slider

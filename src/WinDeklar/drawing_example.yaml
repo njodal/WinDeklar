@@ -1,12 +1,12 @@
 general:
-  back_alpha: 2
+  back_alpha: 1
   back_color: yellow
   # scale_factor: 50
   size:
   - -2.5
   - 3.5
   - -3
-  - 4
+  - 2
 items:
 - item:
     alpha: 3

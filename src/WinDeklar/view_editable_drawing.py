@@ -3,7 +3,7 @@
 import sys
 import time
 
-import WindowForm as WinForm
+import WinDeklar.WindowForm as WinForm
 import WinDeklar.QTAux as QTAux
 import WinDeklar.yaml_functions as yf
 

@@ -1,6 +1,7 @@
 window:
   size: [100, 50, 500, 400]  # [start_x, start_y, width, height]
   title: Input panel
+  desc:  Template for an Input Panel (a set of properties to edit with a Confirm/Cancel buttons).
   layout:
     - item:
         name:    main
