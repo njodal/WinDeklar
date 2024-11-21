@@ -1197,7 +1197,6 @@ class Handle(QGraphicsItemGroup):
         self.parent_item    = parent_item
         self.size           = size
         self.icon_translate = QPointF(self.size/2, -self.size/2)
-        # self.icon_translate = QPointF(0, 0)
         if icon_name is not None:
             pixmap = QPixmap(self.size, self.size)
             pixmap.fill(Qt.transparent)
