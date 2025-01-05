@@ -7,7 +7,7 @@ from matplotlib import animation
 from PyQt5 import QtGui, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from EditableScene import EditableFigure
+from WinDeklar.EditableScene import EditableFigure
 import WinDeklar.points_box as pb
 import WinDeklar.QTAux as QTAux
 import WinDeklar.record as rc
