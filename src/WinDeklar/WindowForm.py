@@ -940,6 +940,11 @@ class TestHost(HostModel):
     """
 
     def __init__(self, initial_values, base_dir=None):
+        """
+        Initialization
+        :param initial_values:
+        :param base_dir: base directory under which is the test file
+        """
         # keys
         self.test_key   = 'test'
 
