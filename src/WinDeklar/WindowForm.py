@@ -939,20 +939,21 @@ class TestHost(HostModel):
         The file name and the test name must be defined in the .yaml config file
     """
 
-    def __init__(self, initial_values):
+    def __init__(self, initial_values, base_dir=None):
         # keys
         self.test_key   = 'test'
 
         # test cases
         self.all_cases = []
         self.output    = None
+        self.base_dir  = base_dir
 
         super(TestHost, self).__init__(initial_values=initial_values)
 
     def initialize(self):
         test_file_name = self.main_window.win_config.get('test_file_name', '')
         test_name      = self.main_window.win_config.get('test_name', '')
-        test_file      = yaml.get_yaml_file(test_file_name)
+        test_file      = yaml.get_yaml_file(test_file_name, directory=self.base_dir)
         test           = yaml.get_record(test_file['general'], test_name, 'tests', 'test', alternative_key_name='call')
         self.all_cases = test['cases']
         self.set_widget_min_max(self.test_key, 0, len(self.all_cases) - 1)
