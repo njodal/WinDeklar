@@ -103,6 +103,16 @@ class ScreenWidget(object):
     def title(self):
         return self.ename
 
+    def set_title(self, new_ename):
+        """
+        Updates the widget title
+        :param new_ename:
+        :return:
+        """
+        self.ename = new_ename
+        if self.label is not None:
+            self.label.setText(self.ename)
+
     def changed(self):
         """
         Internal event triggered when user changes the widget on the form, does the following things:
@@ -133,9 +143,6 @@ class ScreenWidget(object):
     def refresh(self):
         # abstract method
         pass
-
-    def set_ename(self, new_ename):
-        self.ename = new_ename
 
     def set_fixed_width(self, width):
         widget = self.get_widget()
@@ -278,7 +285,7 @@ class Button(ScreenWidget):
     def get_widget(self):
         return self.button
 
-    def set_ename(self, new_ename):
+    def set_title(self, new_ename):
         self.ename = new_ename
         self.button.setText(self.ename)
 
@@ -426,7 +433,7 @@ class Action(ScreenWidget):
         # print('refresh title:%s' % self.current_value())
         self.qt_action.setText(self.current_value())
 
-    def set_ename(self, new_ename):
+    def set_title(self, new_ename):
         self.ename = new_ename
         self.qt_action.setText(self.ename)
 
