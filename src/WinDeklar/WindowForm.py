@@ -75,7 +75,7 @@ class ConfigurableWindow(QtWidgets.QMainWindow):
         if 'back_color' in self.win_config:
             [c1, c2, c3, c4] = self.win_config['back_color']
             self.FRAME.setStyleSheet("QWidget { background-color: %s }" % QtGui.QColor(c1, c2, c3, c4).name())
-        self.LAYOUT   = QtWidgets.QGridLayout()
+        self.LAYOUT = QtWidgets.QGridLayout()
         self.fig_views, layout_widgets = set_layout(self.LAYOUT, self.win_config.get('layout', []), self,
                                                     row_col=[0, 0])
         self.widgets.extend(layout_widgets)
@@ -1014,8 +1014,16 @@ def get_title(win_config, provider, key='title'):
 
 
 def set_layout(father_layout, layout_config, window, row_col=None):
+    """
+    Recursively associate sub layouts to a father layout
+    :param father_layout:
+    :param layout_config: dict with the sub layouts definitions
+    :param window:
+    :param row_col:
+    :return: list of figure and widgets creates
+    """
     fig_views = []
-    widgets  = []
+    widgets   = []
     if father_layout is None or not layout_config:
         return fig_views, widgets
     for sub_layout_config1 in layout_config:
@@ -1205,8 +1213,8 @@ class GeneralProgressBar:
 
 # Widgets definition
 def add_widgets_to_window(layout, layout_config, window):
-    widgets = layout_config.get('widgets', [])
-    return def_widgets(widgets, window.provider, layout)
+    widgets_def = layout_config.get('widgets', [])
+    return def_widgets(widgets_def, window.provider, layout)
 
 
 def def_widgets(widgets_definition, provider, layout):
